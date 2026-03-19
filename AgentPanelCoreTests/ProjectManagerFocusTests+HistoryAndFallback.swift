@@ -92,14 +92,13 @@ extension ProjectManagerFocusTests {
         manager.pushFocusForTest(focus)
         _ = manager.moveWindowToProject(windowId: 99, projectId: "test")
 
-        // Exit should no longer restore the moved window.
+        // Exit should no longer restore the moved window. It succeeds via workspace
+        // fallback, but the invalidated window must not be focused.
         let result = await manager.exitToNonProjectWindow()
-        if case .success = result {
-            XCTFail("Expected noPreviousWindow after history invalidation")
-        }
         if case .failure(let error) = result {
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
+        XCTAssertFalse(aero.focusedWindowIds.contains(99), "Should not focus the moved window")
     }
 
     func testMoveWindowFromProjectUpdatesMostRecentNonProjectFocus() async {
@@ -171,12 +170,12 @@ extension ProjectManagerFocusTests {
         )
     }
 
-    func testCloseProjectLogsExhaustedWhenOnlyProjectWorkspaces() async {
+    func testCloseProjectFallsBackToCanonicalWorkspaceWhenOnlyProjectWorkspaces() async {
         let aero = FocusAeroSpaceStub()
         let manager = makeFocusManager(aerospace: aero)
         loadTestConfig(manager: manager)
 
-        // Only project workspaces — no fallback possible
+        // Only project workspaces — fallback to canonical workspace "1"
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true),
             ApWorkspaceSummary(workspace: "ap-other", isFocused: false)
@@ -186,8 +185,11 @@ extension ProjectManagerFocusTests {
 
         // Close still succeeds (focus restoration is non-fatal)
         if case .failure = result { XCTFail("Expected close to succeed") }
-        // No non-project workspace was focused
-        XCTAssertTrue(aero.focusedWorkspaces.isEmpty, "Should not attempt to focus a project workspace as fallback")
+        // Canonical fallback workspace should be focused to leave project space
+        XCTAssertTrue(
+            aero.focusedWorkspaces.contains(WorkspaceRouting.fallbackWorkspace),
+            "Should fall back to canonical workspace when only project workspaces exist"
+        )
     }
 
     func testExitFallsBackToNonProjectWorkspaceWhenStackEmpty() async {
@@ -219,22 +221,70 @@ extension ProjectManagerFocusTests {
         )
     }
 
-    func testExitFailsWhenNoNonProjectWorkspace() async {
+    // MARK: - Window-gone invalidation after focus failure
+
+    func testExitInvalidatesHistoryWhenWindowGoneAfterFocusFails() async {
+        let aero = FocusAeroSpaceStub()
+        aero.workspacesWithFocusResult = .success([
+            ApWorkspaceSummary(workspace: "ap-test", isFocused: true)
+        ])
+        // Disable workspace fallback so we can observe the invalidation path.
+        aero.focusWorkspaceResult = .failure(ApCoreError(category: .command, message: "no workspace"))
+        registerWindow(aero: aero, windowId: 99, appBundleId: "com.apple.Safari", workspace: "main", windowTitle: "Safari")
+        // Do NOT add 99 to focusWindowSuccessIds — focus will fail.
+
+        // When focus is attempted, remove the window to simulate it closing.
+        var removedWindow = false
+        aero.onFocusWindowAttempt = { windowId in
+            guard windowId == 99, !removedWindow else { return }
+            removedWindow = true
+            aero.windowsByWorkspace["main"]?.removeAll(where: { $0.windowId == 99 })
+            aero.windowsByBundleId["com.apple.Safari"]?.removeAll(where: { $0.windowId == 99 })
+        }
+
+        let manager = makeFocusManager(aerospace: aero, windowPollTimeout: 0.15, windowPollInterval: 0.03)
+        loadTestConfig(manager: manager)
+        let focus = CapturedFocus(windowId: 99, appBundleId: "com.apple.Safari", workspace: "main")
+        manager.pushFocusForTest(focus)
+
+        // First exit: focus fails → window is gone → entry invalidated → fallback disabled → failure.
+        let result1 = await manager.exitToNonProjectWindow()
+        if case .success = result1 { XCTFail("Expected failure (fallback disabled)") }
+
+        // Clear tracking and re-enable workspace fallback.
+        aero.focusedWindowIds.removeAll()
+        aero.focusWorkspaceResult = .success(())
+
+        // Second exit: the invalidated entry should NOT be re-attempted.
+        let result2 = await manager.exitToNonProjectWindow()
+        if case .failure(let error) = result2 {
+            XCTFail("Expected success via workspace fallback, got \(error)")
+        }
+        XCTAssertFalse(
+            aero.focusedWindowIds.contains(99),
+            "Window 99 should have been invalidated (not preserved for retry)"
+        )
+    }
+
+    func testExitFallsBackToCanonicalWorkspaceWhenNoNonProjectWorkspace() async {
         let aero = FocusAeroSpaceStub()
         let manager = makeFocusManager(aerospace: aero)
         loadTestConfig(manager: manager)
 
-        // Only project workspaces
+        // Only project workspaces — fallback to canonical workspace "1"
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true)
         ])
 
         let result = await manager.exitToNonProjectWindow()
 
-        if case .success = result { XCTFail("Expected exit to fail when no non-project workspace") }
         if case .failure(let error) = result {
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
+        XCTAssertTrue(
+            aero.focusedWorkspaces.contains(WorkspaceRouting.fallbackWorkspace),
+            "Should fall back to canonical workspace when no non-project workspace exists"
+        )
     }
 
 }

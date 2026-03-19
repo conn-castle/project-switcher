@@ -45,8 +45,10 @@ final class FocusHistoryTestAeroSpaceStub: AeroSpaceProviding {
         return .success(())
     }
 
+    var focusWorkspaceResult: Result<Void, ApCoreError> = .success(())
+
     func moveWindowToWorkspace(workspace: String, windowId: Int, focusFollows: Bool) -> Result<Void, ApCoreError> { .success(()) }
-    func focusWorkspace(name: String) -> Result<Void, ApCoreError> { .success(()) }
+    func focusWorkspace(name: String) -> Result<Void, ApCoreError> { focusWorkspaceResult }
 }
 
 struct FocusHistoryTestIdeLauncherStub: IdeLauncherProviding {

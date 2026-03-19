@@ -1078,11 +1078,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         } else {
+            guard service.status != .notRegistered else { return }
             do {
                 try service.unregister()
                 logAppEvent(event: "launch_at_login.unregistered")
             } catch {
-                // Unregister failure when not registered is expected; only warn if meaningful
                 logAppEvent(
                     event: "launch_at_login.unregister_failed",
                     level: .warn,

@@ -261,6 +261,16 @@ extension ProjectManager {
             logEvent("close.workspace_closed", context: ["project_id": projectId])
         }
 
+        // Flush stale tree nodes after closing the workspace. AeroSpace may leave
+        // floating window nodes in an unbound state after workspace closure, causing
+        // the subsequent focus command to crash in makeFloatingWindowsSeenAsTiling
+        // with "MacWindow is already unbound". Reloading the config clears this state.
+        if case .failure(let reloadError) = aerospace.reloadConfig() {
+            logEvent("close.post_close_reload_failed", level: .warn,
+                     message: reloadError.message,
+                     context: ["project_id": projectId])
+        }
+
         // Try restoring the focus that was active when this project was first entered.
         // This handles cross-project transitions (A→B→close B→restore A) that the
         // non-project focus stack cannot track.

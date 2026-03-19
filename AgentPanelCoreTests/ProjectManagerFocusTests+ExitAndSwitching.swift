@@ -5,7 +5,7 @@ import XCTest
 extension ProjectManagerFocusTests {
     // MARK: - Exit fails when stack empty
 
-    func testExitToNonProjectFailsWhenStackEmpty() async {
+    func testExitToNonProjectFallsBackToCanonicalWorkspaceWhenStackEmpty() async {
         let aero = FocusAeroSpaceStub()
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true)
@@ -16,9 +16,12 @@ extension ProjectManagerFocusTests {
 
         switch await manager.exitToNonProjectWindow() {
         case .success:
-            XCTFail("Expected noPreviousWindow failure")
+            XCTAssertTrue(
+                aero.focusedWorkspaces.contains(WorkspaceRouting.fallbackWorkspace),
+                "Should fall back to canonical workspace when stack is empty"
+            )
         case .failure(let error):
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
     }
 
@@ -97,11 +100,9 @@ extension ProjectManagerFocusTests {
         manager.pushFocusForTest(focus)
 
         let result = await manager.exitToNonProjectWindow()
-        if case .success = result {
-            XCTFail("Expected noPreviousWindow due to app mismatch")
-        }
+        // Exit succeeds via workspace fallback, but the app-mismatched window must not be focused.
         if case .failure(let error) = result {
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
         XCTAssertFalse(aero.focusedWindowIds.contains(99), "Should not focus app-mismatched window")
     }
@@ -129,12 +130,13 @@ extension ProjectManagerFocusTests {
             break
         }
 
-        // Stack should be empty — project workspace was filtered by real push path
+        // Stack should be empty — project workspace was filtered by real push path.
+        // Exit succeeds via workspace fallback, but the project-A window must not be focused.
         switch await manager.exitToNonProjectWindow() {
         case .success:
-            XCTFail("Expected noPreviousWindow (stack should be empty)")
+            XCTAssertFalse(aero.focusedWindowIds.contains(50), "Should not focus project-A window")
         case .failure(let error):
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
     }
 
@@ -252,12 +254,12 @@ extension ProjectManagerFocusTests {
             XCTFail("Expected activation success with nil preCapturedFocus but got: \(error)")
         }
 
-        // Exit should fail with noPreviousWindow because no focus was pushed
+        // No focus was pushed, so exit succeeds via workspace fallback (not history).
         switch await manager.exitToNonProjectWindow() {
         case .success:
-            XCTFail("Expected noPreviousWindow (no focus was pushed for nil preCapturedFocus)")
+            break
         case .failure(let error):
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
     }
 

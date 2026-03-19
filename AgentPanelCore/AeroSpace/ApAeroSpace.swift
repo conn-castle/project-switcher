@@ -635,7 +635,25 @@ public struct ApAeroSpace {
             return .failure(error)
         case .success(let result):
             guard result.exitCode == 0 else {
-                return .failure(commandError("aerospace focus --window-id \(windowId)", result: result))
+                let error = commandError("aerospace focus --window-id \(windowId)", result: result)
+                // AeroSpace may crash in makeFloatingWindowsSeenAsTiling with
+                // "MacWindow is already unbound" due to stale tree nodes after
+                // workspace closure or monitor changes. Reload config to flush
+                // the stale state, then retry the focus once.
+                if error.isAeroSpaceTreeNodeError {
+                    Self.logger.warning("Tree-node error focusing window \(windowId), retrying after reload-config")
+                    _ = reloadConfig()
+                    switch runAerospace(arguments: ["focus", "--window-id", "\(windowId)"]) {
+                    case .failure(let retryError):
+                        return .failure(retryError)
+                    case .success(let retryResult):
+                        guard retryResult.exitCode == 0 else {
+                            return .failure(commandError("aerospace focus --window-id \(windowId)", result: retryResult))
+                        }
+                        return .success(())
+                    }
+                }
+                return .failure(error)
             }
             return .success(())
         }

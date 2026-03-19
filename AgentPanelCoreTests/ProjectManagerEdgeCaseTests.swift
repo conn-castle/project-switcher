@@ -294,6 +294,56 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         XCTAssertNil(manager.captureCurrentFocus())
     }
 
+    // MARK: - captureCurrentFocus: retry on transient failure
+
+    func testCaptureCurrentFocusRetriesOnTransientFailureAndSucceeds() {
+        let aero = EdgeAeroSpaceStub()
+        let window = ApWindow(windowId: 42, appBundleId: "com.apple.Safari",
+                              workspace: "main", windowTitle: "Safari")
+        // First call fails (non-breaker), second call succeeds.
+        aero.focusedWindowResults = [
+            .failure(ApCoreError(category: .command, message: "transient")),
+            .success(window)
+        ]
+
+        let manager = makeManager(aerospace: aero)
+        let captured = manager.captureCurrentFocus()
+
+        XCTAssertNotNil(captured, "Should succeed on retry after transient failure")
+        XCTAssertEqual(captured?.windowId, 42)
+        XCTAssertEqual(captured?.appBundleId, "com.apple.Safari")
+    }
+
+    func testCaptureCurrentFocusDoesNotRetryOnBreakerOpenError() {
+        let aero = EdgeAeroSpaceStub()
+        let window = ApWindow(windowId: 42, appBundleId: "com.apple.Safari",
+                              workspace: "main", windowTitle: "Safari")
+        // Breaker-open error should not retry, even though a second call would succeed.
+        aero.focusedWindowResults = [
+            .failure(ApCoreError(category: .command, message: "breaker", reason: .circuitBreakerOpen)),
+            .success(window)
+        ]
+
+        let manager = makeManager(aerospace: aero)
+        let captured = manager.captureCurrentFocus()
+
+        XCTAssertNil(captured, "Should not retry when circuit breaker is open")
+    }
+
+    func testCaptureCurrentFocusReturnsNilWhenBothAttemptsFail() {
+        let aero = EdgeAeroSpaceStub()
+        // Both calls fail (non-breaker).
+        aero.focusedWindowResults = [
+            .failure(ApCoreError(category: .command, message: "fail1")),
+            .failure(ApCoreError(category: .command, message: "fail2"))
+        ]
+
+        let manager = makeManager(aerospace: aero)
+        let captured = manager.captureCurrentFocus()
+
+        XCTAssertNil(captured, "Should return nil when both attempts fail")
+    }
+
     // MARK: - focusWorkspace: failure
 
     func testFocusWorkspaceReturnsFalseOnFailure() {
@@ -334,7 +384,7 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
 
     // MARK: - fallbackToNonProjectWorkspace: all non-project workspaces empty
 
-    func testFallbackToNonProjectFailsWhenAllNonProjectWorkspacesAreEmpty() async {
+    func testFallbackToNonProjectFocusesEmptyWorkspaceWhenNoWindowsAvailable() async {
         let aero = EdgeAeroSpaceStub()
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true),
@@ -349,15 +399,14 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
             ProjectConfig(id: "test", name: "Test", path: "/test", color: "blue", useAgentLayer: false)
         ]))
 
-        // exit should fail because no non-project workspace contains a focusable window
+        // exit should succeed by falling back to the empty non-project workspace
         let result = await manager.exitToNonProjectWindow()
-        if case .success = result { XCTFail("Expected noPreviousWindow failure for empty non-project workspaces") }
         if case .failure(let error) = result {
-            XCTAssertEqual(error, .noPreviousWindow)
+            XCTFail("Expected success via empty workspace fallback, got \(error)")
         }
-        XCTAssertFalse(
+        XCTAssertTrue(
             aero.focusedWorkspaces.contains("empty-ws"),
-            "Should not focus an empty workspace as fallback"
+            "Should focus the empty non-project workspace as fallback"
         )
     }
 
@@ -744,6 +793,10 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
 
 private final class EdgeAeroSpaceStub: AeroSpaceProviding {
     var focusedWindowResult: Result<ApWindow, ApCoreError> = .failure(ApCoreError(message: "stub"))
+    /// Sequential results for `focusedWindow()`. Each call shifts the first element.
+    /// When empty or nil, falls back to `focusedWindowResult`.
+    var focusedWindowResults: [Result<ApWindow, ApCoreError>]?
+    private var focusedWindowCallCount = 0
     var focusWindowResult: Result<Void, ApCoreError> = .success(())
     var workspacesWithFocusResult: Result<[ApWorkspaceSummary], ApCoreError> = .success([])
     var focusWorkspaceResult: Result<Void, ApCoreError> = .success(())
@@ -775,7 +828,14 @@ private final class EdgeAeroSpaceStub: AeroSpaceProviding {
     }
     func listAllWindows() -> Result<[ApWindow], ApCoreError> { .success([]) }
 
-    func focusedWindow() -> Result<ApWindow, ApCoreError> { focusedWindowResult }
+    func focusedWindow() -> Result<ApWindow, ApCoreError> {
+        if let sequence = focusedWindowResults, focusedWindowCallCount < sequence.count {
+            let result = sequence[focusedWindowCallCount]
+            focusedWindowCallCount += 1
+            return result
+        }
+        return focusedWindowResult
+    }
 
     func focusWindow(windowId: Int) -> Result<Void, ApCoreError> {
         focusedWindowIds.append(windowId)

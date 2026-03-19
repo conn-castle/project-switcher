@@ -27,13 +27,7 @@ Deferred defects, maintainability refactors, technical debt, risks, and engineer
 
 <!-- ENTRIES START -->
 
-- Issue 2026-03-10 leaveproj: Fallback focus can strand the app in project space
-    Priority: High. Area: focus restoration
-    Description: When there are no recent non-project windows, the app can remain in project space instead of searching for any non-project destination. We should always leave project space, even if the only available fallback is an empty Aerospace workspace.
-    Next step: Update the non-project focus restoration flow to search for any eligible non-project target when the recent-window path is empty and pick one before returning.
-    Notes: Prefer a non-project window when available; otherwise focus an empty Aerospace workspace so the app still exits project space.
-
 - Issue 2026-03-09 testgap: Missing unit tests for new extraction/refactor surfaces
     Priority: Medium. Area: tests
-    Description: Several refactored or newly extracted methods lack direct unit test coverage: `retryTransientWindowOp` (retry+fallback logic), `AeroSpaceCircuitBreaker.beginRecovery` 60s stuck-recovery timeout, `listAllWindows` infrastructure error propagation (circuitBreakerOpen/timeout), `ProjectError.userFacingMessage`, `performBackgroundBreakerRecovery` readiness polling, and `restoreNonProjectFocusFromStack` multi-candidate loop.
+    Description: Several refactored or newly extracted methods lack direct unit test coverage: `retryTransientWindowOp` (retry+fallback logic), `AeroSpaceCircuitBreaker.beginRecovery` 60s stuck-recovery timeout, `listAllWindows` infrastructure error propagation (circuitBreakerOpen/timeout), `ProjectError.userFacingMessage`, `performBackgroundBreakerRecovery` readiness polling, `restoreNonProjectFocusFromStack` multi-candidate loop, `ApAeroSpace.focusWindow` tree-node error retry path, `closeProject` post-close `reloadConfig` call verification, and `captureWindowPositions` skip-on-no-IDE-windows guard.
     Next step: Add focused unit tests for `retryTransientWindowOp` covering immediate success, transient retry, fallback invocation, and permanent failure paths.

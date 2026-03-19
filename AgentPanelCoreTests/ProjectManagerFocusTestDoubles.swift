@@ -9,6 +9,8 @@ final class FocusAeroSpaceStub: AeroSpaceProviding {
     var workspacesWithFocusResult: Result<[ApWorkspaceSummary], ApCoreError> = .success([])
     var focusedWindowIds: [Int] = []
     var listAllWindowsResultOverride: Result<[ApWindow], ApCoreError>?
+    /// Callback invoked on each `focusWindow()` call — used to modify stub state during focus stabilization.
+    var onFocusWindowAttempt: ((Int) -> Void)?
 
     /// Windows returned by `listWindowsForApp(bundleId:)`, keyed by bundle ID.
     var windowsByBundleId: [String: [ApWindow]] = [:]
@@ -66,6 +68,7 @@ final class FocusAeroSpaceStub: AeroSpaceProviding {
     func focusedWindow() -> Result<ApWindow, ApCoreError> { focusedWindowResult }
     func focusWindow(windowId: Int) -> Result<Void, ApCoreError> {
         focusedWindowIds.append(windowId)
+        onFocusWindowAttempt?(windowId)
         if focusWindowSuccessIds.contains(windowId) {
             if case .success(let focused) = focusedWindowResult, focused.windowId == windowId {
                 return .success(())

@@ -223,10 +223,13 @@ public struct WindowPositionResult: Equatable, Sendable {
     public let positioned: Int
     /// Total number of windows that matched the title token.
     public let matched: Int
+    /// Per-window error messages for windows that failed to be positioned.
+    public let failures: [String]
 
-    public init(positioned: Int, matched: Int) {
+    public init(positioned: Int, matched: Int, failures: [String] = []) {
         self.positioned = positioned
         self.matched = matched
+        self.failures = failures
     }
 
     /// True when some matched windows failed to be positioned.

@@ -86,15 +86,12 @@ final class ProjectManagerFocusHistoryPersistenceTests: XCTestCase {
             chrome: ChromeConfig()
         ))
 
+        // Exit succeeds via workspace fallback, but the stale window must not be focused.
         let result = await manager.exitToNonProjectWindow()
-        switch result {
-        case .failure(.noPreviousWindow):
-            break
-        case .failure(let error):
-            XCTFail("Expected noPreviousWindow, got \(error)")
-        case .success:
-            XCTFail("Expected noPreviousWindow, got success")
+        if case .failure(let error) = result {
+            XCTFail("Expected success via workspace fallback, got \(error)")
         }
+        XCTAssertFalse(aero.focusedWindowIds.contains(10), "Stale entry should be pruned and not focused")
     }
 
     func testLoadFocusHistoryFailureFallsBackToEmptyHistory() async {
@@ -120,11 +117,11 @@ final class ProjectManagerFocusHistoryPersistenceTests: XCTestCase {
             chrome: ChromeConfig()
         ))
 
+        // History load failure → empty history → exit succeeds via workspace fallback.
         let result = await manager.exitToNonProjectWindow()
-        if case .failure(.noPreviousWindow) = result {
-            return
+        if case .failure(let error) = result {
+            XCTFail("Expected success via workspace fallback when history cannot be loaded, got \(error)")
         }
-        XCTFail("Expected noPreviousWindow when persisted history cannot be loaded")
     }
 
     func testPersistFocusHistoryFailureDoesNotBreakInMemoryRestore() async {

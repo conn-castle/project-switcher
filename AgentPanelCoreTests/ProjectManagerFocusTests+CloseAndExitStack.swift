@@ -173,6 +173,8 @@ extension ProjectManagerFocusTests {
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true)
         ])
+        // Disable workspace fallback so the retry path is exercised.
+        aero.focusWorkspaceResult = .failure(ApCoreError(category: .command, message: "no workspace"))
         registerWindow(aero: aero, windowId: 99, appBundleId: "com.apple.Safari", workspace: "main", windowTitle: "Safari")
 
         let manager = makeFocusManager(aerospace: aero)
@@ -190,6 +192,7 @@ extension ProjectManagerFocusTests {
 
         // Second attempt succeeds and should still restore from history.
         aero.focusWindowSuccessIds = [99]
+        aero.focusWorkspaceResult = .success(())
         switch await manager.exitToNonProjectWindow() {
         case .success:
             XCTAssertTrue(aero.focusedWindowIds.contains(99))
@@ -203,6 +206,8 @@ extension ProjectManagerFocusTests {
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true)
         ])
+        // Disable workspace fallback so the retry path is exercised.
+        aero.focusWorkspaceResult = .failure(ApCoreError(category: .command, message: "no workspace"))
         registerWindow(aero: aero, windowId: 99, appBundleId: "com.apple.Safari", workspace: "main", windowTitle: "Safari")
 
         let manager = makeFocusManager(
@@ -226,6 +231,7 @@ extension ProjectManagerFocusTests {
         }
 
         aero.focusWindowSuccessIds = [99]
+        aero.focusWorkspaceResult = .success(())
         switch await manager.exitToNonProjectWindow() {
         case .success:
             XCTAssertTrue(aero.focusedWindowIds.contains(99), "Candidate should remain retriable after two failed invocations")
@@ -265,6 +271,8 @@ extension ProjectManagerFocusTests {
         aero.workspacesWithFocusResult = .success([
             ApWorkspaceSummary(workspace: "ap-test", isFocused: true)
         ])
+        // Disable workspace fallback so the retry limit path is exercised.
+        aero.focusWorkspaceResult = .failure(ApCoreError(category: .command, message: "no workspace"))
         registerWindow(aero: aero, windowId: 99, appBundleId: "com.apple.Safari", workspace: "main", windowTitle: "Safari")
 
         let manager = makeFocusManager(
