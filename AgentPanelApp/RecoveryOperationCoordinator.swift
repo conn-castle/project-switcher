@@ -75,13 +75,11 @@ final class RecoveryOperationCoordinator {
         // Snapshot mutable callback on the caller's thread (main) before entering
         // the detached task to avoid a data race on the non-Sendable property.
         let callback = onCurrentWindowRecovered
-        let logFn = { [weak self] (event: String, level: LogLevel, message: String?) in
-            self?.logEvent(event, level: level, message: message)
-        }
+        let capturedLogger = self.logger
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else {
-                logFn("recover_current_window.coordinator_unavailable", .warn, "Recovery coordinator deallocated during recovery")
+                _ = capturedLogger.log(event: "recover_current_window.coordinator_unavailable", level: .warn, message: "Recovery coordinator deallocated during recovery", context: nil)
                 return
             }
             let manager = self.makeRecoveryManager(screenFrame, nil)
@@ -104,13 +102,11 @@ final class RecoveryOperationCoordinator {
         logEvent("recover_workspace.requested", context: ["workspace": focus.workspace])
 
         let callback = onWorkspaceRecovered
-        let logFn = { [weak self] (event: String, level: LogLevel, message: String?) in
-            self?.logEvent(event, level: level, message: message)
-        }
+        let capturedLogger = self.logger
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else {
-                logFn("recover_workspace.coordinator_unavailable", .warn, "Recovery coordinator deallocated during recovery")
+                _ = capturedLogger.log(event: "recover_workspace.coordinator_unavailable", level: .warn, message: "Recovery coordinator deallocated during recovery", context: nil)
                 return
             }
             let layoutConfig = self.currentLayoutConfig()
@@ -172,13 +168,11 @@ final class RecoveryOperationCoordinator {
         // entering the detached task to avoid a data race on non-Sendable properties.
         let progressCallback = onAllWindowsProgress
         let completionCallback = onAllWindowsCompleted
-        let logFn = { [weak self] (event: String, level: LogLevel, message: String?) in
-            self?.logEvent(event, level: level, message: message)
-        }
+        let capturedLogger = self.logger
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else {
-                logFn("recover_all_windows.coordinator_unavailable", .warn, "Recovery coordinator deallocated during recovery")
+                _ = capturedLogger.log(event: "recover_all_windows.coordinator_unavailable", level: .warn, message: "Recovery coordinator deallocated during recovery", context: nil)
                 return
             }
             let layoutConfig = self.currentLayoutConfig()

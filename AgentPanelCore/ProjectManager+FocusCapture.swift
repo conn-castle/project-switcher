@@ -17,6 +17,12 @@ extension ProjectManager {
                 logEvent("focus.capture.failed", level: .info, message: error.message)
                 return nil
             }
+            // Only retry off the main thread — Thread.sleep would block UI.
+            guard !Thread.isMainThread else {
+                logEvent("focus.capture.failed", level: .warn, message: error.message,
+                         context: ["retry_skipped": "main_thread"])
+                return nil
+            }
             // Single retry after a short delay for transient failures.
             Thread.sleep(forTimeInterval: 0.15)
             switch aerospace.focusedWindow() {

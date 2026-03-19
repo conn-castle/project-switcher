@@ -39,6 +39,11 @@ public struct ApAeroSpace {
     /// Default timeout for aerospace command execution.
     private static let defaultCommandTimeoutSeconds: TimeInterval = 5
 
+    /// Cooldown between tree-node recovery reloads to avoid repeated
+    /// `reload-config` in tight polling loops (e.g., `focusWindowStableSync`).
+    private static let treeNodeReloadCooldownSeconds: TimeInterval = 5.0
+    private static var lastTreeNodeReloadDate = Date.distantPast
+
     /// Recovery detail when hung-process termination fails.
     private static let recoveryTerminateFailedDetail =
         "AeroSpace process is running but unresponsive, and termination failed. Restart AeroSpace manually."
@@ -642,7 +647,9 @@ public struct ApAeroSpace {
                 // "MacWindow is already unbound" due to stale tree nodes after
                 // workspace closure or monitor changes. Reload config to flush
                 // the stale state, then retry the focus once.
-                if error.isAeroSpaceTreeNodeError {
+                if error.isAeroSpaceTreeNodeError,
+                   Date().timeIntervalSince(Self.lastTreeNodeReloadDate) >= Self.treeNodeReloadCooldownSeconds {
+                    Self.lastTreeNodeReloadDate = Date()
                     Self.logger.warning("Tree-node error focusing window \(windowId), retrying after reload-config")
                     _ = Self.structuredLogger.log(
                         event: "aerospace.focus_window.tree_node_error",

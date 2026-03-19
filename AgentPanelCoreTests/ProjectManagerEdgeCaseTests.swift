@@ -307,7 +307,15 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         ]
 
         let manager = makeManager(aerospace: aero)
-        let captured = manager.captureCurrentFocus()
+
+        // Retry requires off-main-thread (Thread.sleep guard).
+        let expectation = expectation(description: "capture completes")
+        var captured: CapturedFocus?
+        DispatchQueue.global().async {
+            captured = manager.captureCurrentFocus()
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2.0)
 
         XCTAssertNotNil(captured, "Should succeed on retry after transient failure")
         XCTAssertEqual(captured?.windowId, 42)
@@ -339,7 +347,15 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         ]
 
         let manager = makeManager(aerospace: aero)
-        let captured = manager.captureCurrentFocus()
+
+        // Retry requires off-main-thread (Thread.sleep guard).
+        let expectation = expectation(description: "capture completes")
+        var captured: CapturedFocus?
+        DispatchQueue.global().async {
+            captured = manager.captureCurrentFocus()
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2.0)
 
         XCTAssertNil(captured, "Should return nil when both attempts fail")
     }

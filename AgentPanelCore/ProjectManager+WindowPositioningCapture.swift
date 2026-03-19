@@ -12,12 +12,6 @@ extension ProjectManager {
             return
         }
 
-        // Skip capture when IDE app has no windows (e.g., VS Code closed after project exit).
-        if case .success(let ideWindows) = aerospace.listWindowsForApp(bundleId: ApVSCodeLauncher.bundleId),
-           ideWindows.isEmpty {
-            return
-        }
-
         // Read IDE primary frame
         let ideFrame: CGRect
         switch positioner.getPrimaryWindowFrame(bundleId: ApVSCodeLauncher.bundleId, projectId: projectId) {

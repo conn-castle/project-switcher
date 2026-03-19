@@ -45,7 +45,7 @@ extension ProjectManager {
 
         logEvent("focus.workspace.timeout", level: .warn, context: [
             "workspace": name,
-            "timeout_seconds": "\(Int(windowPollTimeout))"
+            "timeout_seconds": String(format: "%.1f", windowPollTimeout)
         ])
         return false
     }
