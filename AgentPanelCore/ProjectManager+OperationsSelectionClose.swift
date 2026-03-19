@@ -255,7 +255,11 @@ extension ProjectManager {
 
         switch aerospace.closeWorkspace(name: workspace) {
         case .failure(let error):
-            logEvent("close.failed", level: .error, context: ["error": error.message])
+            logEvent("close.failed", level: .error, context: [
+                "project_id": projectId,
+                "workspace": workspace,
+                "error": error.message
+            ])
             return .failure(.aeroSpaceError(detail: error.message))
         case .success:
             logEvent("close.workspace_closed", context: ["project_id": projectId])
@@ -301,7 +305,11 @@ extension ProjectManager {
                         "lookup_available": "\(windowLookup != nil)"
                     ])
                 case .failure(let error):
-                    logEvent("close.pre_entry_focus_failed", level: .warn, message: error.message)
+                    logEvent("close.pre_entry_focus_failed", level: .warn, message: error.message, context: [
+                        "project_id": projectId,
+                        "window_id": "\(preEntry.focus.windowId)",
+                        "workspace": preEntry.focus.workspace
+                    ])
                 }
             } else {
                 logEvent("close.pre_entry_focus_window_gone", context: [
@@ -322,9 +330,9 @@ extension ProjectManager {
                 "workspace": focus.workspace
             ])
         } else if let ws = fallbackToNonProjectWorkspace() {
-            logEvent("close.focus_fallback_workspace", context: ["workspace": ws])
+            logEvent("close.focus_fallback_workspace", context: ["project_id": projectId, "workspace": ws])
         } else {
-            logEvent("close.focus_restore_exhausted", level: .warn)
+            logEvent("close.focus_restore_exhausted", level: .warn, context: ["project_id": projectId])
         }
 
         logEvent("close.completed", context: ["project_id": projectId])

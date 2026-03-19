@@ -8,6 +8,8 @@ import os
 /// orchestration (recovery, retry) lives in `ApAeroSpace`.
 struct AeroSpaceCommandTransport {
     private static let logger = Logger(subsystem: "com.agentpanel", category: "AeroSpaceCommandTransport")
+    /// Structured logger for JSON log file events (complements os.Logger for triage).
+    private static let structuredLogger = AgentPanelLogger()
 
     let commandRunner: CommandRunning
     let circuitBreaker: AeroSpaceCircuitBreaker
@@ -45,6 +47,16 @@ struct AeroSpaceCommandTransport {
                 circuitBreaker.recordTimeout()
                 if !wasOpen {
                     Self.logger.warning("circuit_breaker.tripped command=aerospace \(arguments.joined(separator: " "), privacy: .public) timeout=\(timeoutSeconds)s")
+                    _ = Self.structuredLogger.log(
+                        event: "circuit_breaker.tripped",
+                        level: .warn,
+                        message: "AeroSpace command timed out, circuit breaker tripped",
+                        context: [
+                            "command": "aerospace \(arguments.joined(separator: " "))",
+                            "timeout_seconds": "\(timeoutSeconds)",
+                            "cooldown_seconds": "\(circuitBreaker.cooldownSeconds)"
+                        ]
+                    )
                 }
             }
         }

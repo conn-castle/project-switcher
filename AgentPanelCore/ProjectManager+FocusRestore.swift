@@ -129,7 +129,9 @@ extension ProjectManager {
         if let freshLookup = listAllWindowsById() {
             windowStillExists = freshLookup[resolved.windowId] != nil
         } else {
-            // Lookup unavailable (AeroSpace unreachable); assume window may still exist.
+            logEvent("focus.history.window_lookup_unavailable", level: .warn,
+                     message: "AeroSpace unreachable during focus restore; assuming window exists",
+                     context: ["window_id": "\(resolved.windowId)", "method": method])
             windowStillExists = true
         }
 

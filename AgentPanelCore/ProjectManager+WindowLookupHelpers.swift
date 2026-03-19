@@ -43,12 +43,23 @@ extension ProjectManager {
             try? await Task.sleep(nanoseconds: UInt64(windowPollInterval * 1_000_000_000))
         }
 
+        logEvent("focus.workspace.timeout", level: .warn, context: [
+            "workspace": name,
+            "timeout_seconds": "\(Int(windowPollTimeout))"
+        ])
         return false
     }
 
     /// Finds a tagged window for the given app across all monitors.
     func findWindowByToken(appBundleId: String, projectId: String) -> ApWindow? {
-        guard case .success(let windows) = aerospace.listWindowsForApp(bundleId: appBundleId) else {
+        let windows: [ApWindow]
+        switch aerospace.listWindowsForApp(bundleId: appBundleId) {
+        case .success(let result):
+            windows = result
+        case .failure(let error):
+            logEvent("window_lookup.list_failed", level: .warn,
+                     message: error.message,
+                     context: ["app_bundle_id": appBundleId, "project_id": projectId])
             return nil
         }
         let token = "\(ApIdeToken.prefix)\(projectId)"
@@ -76,12 +87,17 @@ extension ProjectManager {
     /// Polls until both windows are in the target workspace.
     func pollForWindowsInWorkspace(chromeWindowId: Int, ideWindowId: Int, workspace: String) async -> Result<Void, ProjectError> {
         let deadline = Date().addingTimeInterval(windowPollTimeout)
+        var loggedQueryFailure = false
 
         while Date() < deadline {
             switch aerospace.listWindowsWorkspace(workspace: workspace) {
-            case .failure:
-                // Workspace might not be queryable yet, keep polling
-                break
+            case .failure(let error):
+                if !loggedQueryFailure {
+                    logEvent("select.workspace_query_pending",
+                             message: error.message,
+                             context: ["workspace": workspace])
+                    loggedQueryFailure = true
+                }
             case .success(let windows):
                 let windowIds = Set(windows.map { $0.windowId })
                 if windowIds.contains(chromeWindowId) && windowIds.contains(ideWindowId) {

@@ -17,6 +17,9 @@ public struct AeroSpaceConfigManager {
     /// Resource name for the safe config template.
     private static let safeConfigResourceName = "aerospace-safe"
 
+    /// Structured logger for config management events.
+    private static let structuredLogger = AgentPanelLogger()
+
     /// Default path to the AeroSpace config file.
     public static var configPath: String {
         URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
@@ -36,17 +39,33 @@ public struct AeroSpaceConfigManager {
     private let backupPath: String
     private let safeConfigLoader: () -> String?
 
+    /// Loads the bundled aerospace-safe.toml, logging any read errors.
+    ///
+    /// Returns nil when the resource is not bundled (expected for CLI tools) or
+    /// when reading fails (logged as an error).
+    private static func loadBundledConfigContent() -> String? {
+        guard let url = Bundle.main.url(forResource: safeConfigResourceName, withExtension: "toml") else {
+            return nil
+        }
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            _ = structuredLogger.log(
+                event: "config.bundle_resource_read_failed",
+                level: .error,
+                message: "Failed to read bundled aerospace-safe.toml",
+                context: ["error": error.localizedDescription, "url": url.path]
+            )
+            return nil
+        }
+    }
+
     /// Creates a config manager.
     public init() {
         self.fileManager = .default
         self.configPath = Self.configPath
         self.backupPath = Self.backupPath
-        self.safeConfigLoader = {
-            guard let url = Bundle.main.url(forResource: Self.safeConfigResourceName, withExtension: "toml") else {
-                return nil
-            }
-            return try? String(contentsOf: url, encoding: .utf8)
-        }
+        self.safeConfigLoader = { Self.loadBundledConfigContent() }
     }
 
     /// Creates a config manager with a custom file manager.
@@ -55,12 +74,7 @@ public struct AeroSpaceConfigManager {
         fileManager: FileManager,
         configPath: String = AeroSpaceConfigManager.configPath,
         backupPath: String = AeroSpaceConfigManager.backupPath,
-        safeConfigLoader: @escaping () -> String? = {
-            guard let url = Bundle.main.url(forResource: AeroSpaceConfigManager.safeConfigResourceName, withExtension: "toml") else {
-                return nil
-            }
-            return try? String(contentsOf: url, encoding: .utf8)
-        }
+        safeConfigLoader: @escaping () -> String? = { AeroSpaceConfigManager.loadBundledConfigContent() }
     ) {
         self.fileManager = fileManager
         self.configPath = configPath
@@ -161,7 +175,17 @@ public struct AeroSpaceConfigManager {
     /// does not exist or cannot be read.
     public func configContents() -> String? {
         guard configExists() else { return nil }
-        return try? String(contentsOfFile: configPath, encoding: .utf8)
+        do {
+            return try String(contentsOfFile: configPath, encoding: .utf8)
+        } catch {
+            _ = Self.structuredLogger.log(
+                event: "config.file_read_failed",
+                level: .error,
+                message: "Failed to read AeroSpace config file",
+                context: ["path": configPath, "error": error.localizedDescription]
+            )
+            return nil
+        }
     }
 
     /// Returns the status of the AeroSpace config for diagnostic purposes.

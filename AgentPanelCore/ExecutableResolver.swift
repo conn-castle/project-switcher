@@ -8,6 +8,9 @@ import Foundation
 /// This resolver checks standard installation paths and falls back to a login
 /// shell `which` lookup for non-standard locations.
 struct ExecutableResolver {
+    /// Structured logger for executable resolution events.
+    private static let structuredLogger = AgentPanelLogger()
+
     /// Standard search paths for macOS executables.
     static let standardSearchPaths: [String] = [
         "/opt/homebrew/bin",
@@ -170,6 +173,16 @@ struct ExecutableResolver {
             try process.run()
         } catch {
             handle.readabilityHandler = nil
+            _ = Self.structuredLogger.log(
+                event: "executable_resolver.shell_launch_failed",
+                level: .warn,
+                message: "Login shell process failed to start",
+                context: [
+                    "command": command,
+                    "shell": Self.loginShellPath,
+                    "error": error.localizedDescription
+                ]
+            )
             return nil
         }
 
@@ -185,6 +198,16 @@ struct ExecutableResolver {
         handle.readabilityHandler = nil
 
         guard waitResult == .success else {
+            _ = Self.structuredLogger.log(
+                event: "executable_resolver.shell_timeout",
+                level: .warn,
+                message: "Login shell command timed out",
+                context: [
+                    "command": command,
+                    "timeout_seconds": "\(loginShellTimeoutSeconds)",
+                    "shell": Self.loginShellPath
+                ]
+            )
             return nil
         }
 
