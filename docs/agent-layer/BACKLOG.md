@@ -28,6 +28,12 @@ Unscheduled user-visible features and tasks (distinct from issues; not refactors
 
 <!-- ENTRIES START -->
 
+- Backlog 2026-03-19 aerobug: Detect AeroSpace crash and surface user notification
+    Priority: Low. Area: external dependency
+    Description: AeroSpace 0.20.2-Beta crashes at `Workspace.swift:97:14 ==(_:_:)` during `socketServer` refresh. Our circuit breaker handles the outage, but the user has no visibility. Detect crashes via `/tmp/bobko.aerospace/aerospace-runtime-error.txt` and show a notification.
+    Acceptance criteria: When AeroSpace crash file is detected, a user-visible notification is shown explaining the situation.
+    Notes: Upstream bug — file or check for existing report at github.com/nikitabobko/AeroSpace.
+
 - Backlog 2026-02-20 favorites: Favorites/stars for projects
     Priority: Deferred. Area: Switcher UX
     Description: Persisted favorite/star flag per project with UI affordances (star icon, Favorites section, Cmd+D toggle). Bulk "Open All Favorites" action to activate all starred projects.

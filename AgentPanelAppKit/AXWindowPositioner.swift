@@ -101,6 +101,7 @@ public struct AXWindowPositioner: WindowPositioning {
 
         var positioned = 0
         var lastError: ApCoreError?
+        var failures: [String] = []
         for (index, element) in matches.enumerated() {
             let offset = CGFloat(index) * cascadeOffsetPoints
             var frame = CGRect(
@@ -120,6 +121,7 @@ public struct AXWindowPositioner: WindowPositioning {
                 positioned += 1
             case .failure(let error):
                 lastError = error
+                failures.append("window[\(index)]: \(error.message)")
                 Self.logger.warning("Failed to set frame for match \(index) of \(bundleId): \(error.message)")
             }
         }
@@ -128,7 +130,7 @@ public struct AXWindowPositioner: WindowPositioning {
             return .failure(error)
         }
 
-        return .success(WindowPositionResult(positioned: positioned, matched: matches.count))
+        return .success(WindowPositionResult(positioned: positioned, matched: matches.count, failures: failures))
     }
 
     public func getFallbackWindowFrame(bundleId: String) -> Result<CGRect, ApCoreError> {

@@ -67,14 +67,21 @@ final class RecoveryOperationCoordinator {
     ///   - workspace: The workspace containing the window.
     ///   - screenFrame: Visible screen frame (captured on main thread by caller).
     func recoverCurrentWindow(windowId: Int, workspace: String, screenFrame: CGRect) {
-        logEvent("recover_current_window.requested")
+        logEvent("recover_current_window.requested", context: [
+            "window_id": "\(windowId)",
+            "workspace": workspace
+        ])
 
         // Snapshot mutable callback on the caller's thread (main) before entering
         // the detached task to avoid a data race on the non-Sendable property.
         let callback = onCurrentWindowRecovered
+        let capturedLogger = self.logger
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                _ = capturedLogger.log(event: "recover_current_window.coordinator_unavailable", level: .warn, message: "Recovery coordinator deallocated during recovery", context: nil)
+                return
+            }
             let manager = self.makeRecoveryManager(screenFrame, nil)
             let result = manager.recoverCurrentWindow(windowId: windowId, workspace: workspace)
             await MainActor.run {
@@ -92,12 +99,16 @@ final class RecoveryOperationCoordinator {
     ///   - focus: Captured focus that determines the target workspace.
     ///   - screenFrame: Visible screen frame (captured on main thread by caller).
     func recoverWorkspaceWindows(focus: CapturedFocus, screenFrame: CGRect) {
-        logEvent("recover_workspace.requested")
+        logEvent("recover_workspace.requested", context: ["workspace": focus.workspace])
 
         let callback = onWorkspaceRecovered
+        let capturedLogger = self.logger
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                _ = capturedLogger.log(event: "recover_workspace.coordinator_unavailable", level: .warn, message: "Recovery coordinator deallocated during recovery", context: nil)
+                return
+            }
             let layoutConfig = self.currentLayoutConfig()
             let manager = self.makeRecoveryManager(screenFrame, layoutConfig)
             let result = await manager.recoverWorkspaceWindows(workspace: focus.workspace)
@@ -148,15 +159,22 @@ final class RecoveryOperationCoordinator {
     ///
     /// - Parameter screenFrame: Visible screen frame (captured on main thread by caller).
     func recoverAllWindows(screenFrame: CGRect) {
-        logEvent("recover_all_windows.requested")
+        logEvent("recover_all_windows.requested", context: [
+            "screen_width": "\(Int(screenFrame.width))",
+            "screen_height": "\(Int(screenFrame.height))"
+        ])
 
         // Snapshot mutable callbacks on the caller's thread (main) before
         // entering the detached task to avoid a data race on non-Sendable properties.
         let progressCallback = onAllWindowsProgress
         let completionCallback = onAllWindowsCompleted
+        let capturedLogger = self.logger
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                _ = capturedLogger.log(event: "recover_all_windows.coordinator_unavailable", level: .warn, message: "Recovery coordinator deallocated during recovery", context: nil)
+                return
+            }
             let layoutConfig = self.currentLayoutConfig()
             let manager = self.makeRecoveryManager(screenFrame, layoutConfig)
             let result = await manager.recoverAllWindows { current, total in

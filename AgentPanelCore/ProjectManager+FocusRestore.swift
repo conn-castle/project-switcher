@@ -123,17 +123,33 @@ extension ProjectManager {
             return resolved
         }
 
+        // Before preserving for retry, check if the window still exists.
+        // If the window is gone, invalidate immediately instead of wasting future retry attempts.
+        let windowStillExists: Bool
+        if let freshLookup = listAllWindowsById() {
+            windowStillExists = freshLookup[resolved.windowId] != nil
+        } else {
+            logEvent("focus.history.window_lookup_unavailable", level: .warn,
+                     message: "AeroSpace unreachable during focus restore; assuming window exists",
+                     context: ["window_id": "\(resolved.windowId)", "method": method])
+            windowStillExists = true
+        }
+
         let failureSnapshot = focusHistorySnapshot()
         let failureContext = focusHistoryContext(
             windowId: resolved.windowId,
             workspace: resolved.workspace,
             appBundleId: resolved.appBundleId,
             method: method,
-            reason: "focus_failed",
+            reason: windowStillExists ? "focus_failed" : "window_gone_after_focus",
             snapshot: failureSnapshot
         )
         logEvent("focus.history.restore_failed", level: .warn, message: "Focus did not stabilize", context: failureContext)
-        preserveFocusHistoryForRetry(resolved, capturedAt: candidate.capturedAt, method: method)
+        if windowStillExists {
+            preserveFocusHistoryForRetry(resolved, capturedAt: candidate.capturedAt, method: method)
+        } else {
+            invalidateFocusHistory(windowId: resolved.windowId, reason: "window_gone_after_focus")
+        }
         return nil
     }
 

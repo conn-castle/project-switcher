@@ -317,12 +317,6 @@ final class FocusCycleHotkeyManager: FocusCycleStatusProviding {
                 return
             }
             if !Self.isOptionModifierDownGlobally {
-                _ = self.logger.log(
-                    event: "focus_cycle.overlay.option_release_watchdog_triggered",
-                    level: .info,
-                    message: "Option release detected by watchdog polling.",
-                    context: nil
-                )
                 self.handleOptionReleased()
             }
         }

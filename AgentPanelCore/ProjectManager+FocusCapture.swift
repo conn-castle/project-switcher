@@ -4,21 +4,47 @@ extension ProjectManager {
     // MARK: - Focus Capture/Restore (for Switcher UX)
 
     /// Captures the currently focused window for later restoration.
+    ///
+    /// Retries once after a short delay on transient failures (e.g., race during
+    /// workspace transitions), but not when the circuit breaker is open.
     public func captureCurrentFocus() -> CapturedFocus? {
-        switch aerospace.focusedWindow() {
-        case .failure(let error):
-            logEvent("focus.capture.failed", level: error.isBreakerOpen ? .info : .warn, message: error.message)
-            return nil
+        let result = aerospace.focusedWindow()
+        switch result {
         case .success(let window):
-            let captured = CapturedFocus(windowId: window.windowId, appBundleId: window.appBundleId, workspace: window.workspace)
-            updateMostRecentNonProjectFocus(captured)
-            logEvent("focus.captured", context: [
-                "window_id": "\(captured.windowId)",
-                "app_bundle_id": captured.appBundleId,
-                "workspace": captured.workspace
-            ])
-            return captured
+            return finishCapture(window)
+        case .failure(let error):
+            guard !error.isBreakerOpen else {
+                logEvent("focus.capture.failed", level: .info, message: error.message)
+                return nil
+            }
+            // Only retry off the main thread — Thread.sleep would block UI.
+            guard !Thread.isMainThread else {
+                logEvent("focus.capture.failed", level: .warn, message: error.message,
+                         context: ["retry_skipped": "main_thread"])
+                return nil
+            }
+            // Single retry after a short delay for transient failures.
+            Thread.sleep(forTimeInterval: 0.15)
+            switch aerospace.focusedWindow() {
+            case .success(let window):
+                logEvent("focus.capture.retried", context: ["window_id": "\(window.windowId)"])
+                return finishCapture(window)
+            case .failure(let retryError):
+                logEvent("focus.capture.failed", level: retryError.isBreakerOpen ? .info : .warn, message: retryError.message)
+                return nil
+            }
         }
+    }
+
+    private func finishCapture(_ window: ApWindow) -> CapturedFocus {
+        let captured = CapturedFocus(windowId: window.windowId, appBundleId: window.appBundleId, workspace: window.workspace)
+        updateMostRecentNonProjectFocus(captured)
+        logEvent("focus.captured", context: [
+            "window_id": "\(captured.windowId)",
+            "app_bundle_id": captured.appBundleId,
+            "workspace": captured.workspace
+        ])
+        return captured
     }
 
     /// Restores focus to a previously captured window.

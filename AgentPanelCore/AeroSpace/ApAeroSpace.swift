@@ -33,9 +33,16 @@ struct ApWorkspaceSummary: Equatable, Sendable {
 /// AeroSpace CLI wrapper for ap.
 public struct ApAeroSpace {
     private static let logger = Logger(subsystem: "com.agentpanel", category: "ApAeroSpace")
+    /// Structured logger for JSON log file events (complements os.Logger for triage).
+    private static let structuredLogger = AgentPanelLogger()
 
     /// Default timeout for aerospace command execution.
     private static let defaultCommandTimeoutSeconds: TimeInterval = 5
+
+    /// Cooldown between tree-node recovery reloads to avoid repeated
+    /// `reload-config` in tight polling loops (e.g., `focusWindowStableSync`).
+    private static let treeNodeReloadCooldownSeconds: TimeInterval = 5.0
+    private static var lastTreeNodeReloadDate = Date.distantPast
 
     /// Recovery detail when hung-process termination fails.
     private static let recoveryTerminateFailedDetail =
@@ -635,7 +642,33 @@ public struct ApAeroSpace {
             return .failure(error)
         case .success(let result):
             guard result.exitCode == 0 else {
-                return .failure(commandError("aerospace focus --window-id \(windowId)", result: result))
+                let error = commandError("aerospace focus --window-id \(windowId)", result: result)
+                // AeroSpace may crash in makeFloatingWindowsSeenAsTiling with
+                // "MacWindow is already unbound" due to stale tree nodes after
+                // workspace closure or monitor changes. Reload config to flush
+                // the stale state, then retry the focus once.
+                if error.isAeroSpaceTreeNodeError,
+                   Date().timeIntervalSince(Self.lastTreeNodeReloadDate) >= Self.treeNodeReloadCooldownSeconds {
+                    Self.lastTreeNodeReloadDate = Date()
+                    Self.logger.warning("Tree-node error focusing window \(windowId), retrying after reload-config")
+                    _ = Self.structuredLogger.log(
+                        event: "aerospace.focus_window.tree_node_error",
+                        level: .warn,
+                        message: "AeroSpace tree-node error, retrying after config reload",
+                        context: ["window_id": "\(windowId)"]
+                    )
+                    _ = reloadConfig()
+                    switch runAerospace(arguments: ["focus", "--window-id", "\(windowId)"]) {
+                    case .failure(let retryError):
+                        return .failure(retryError)
+                    case .success(let retryResult):
+                        guard retryResult.exitCode == 0 else {
+                            return .failure(commandError("aerospace focus --window-id \(windowId)", result: retryResult))
+                        }
+                        return .success(())
+                    }
+                }
+                return .failure(error)
             }
             return .success(())
         }
@@ -795,7 +828,13 @@ public struct ApAeroSpace {
         if let checker = processChecker,
            circuitBreaker.beginRecovery() {
             let terminatingChecker = checker as? (RunningApplicationChecking & RunningApplicationTerminating)
-            Self.logger.info("circuit_breaker.recovery_started thread=\(Thread.isMainThread ? "main" : "background", privacy: .public)")
+            let thread = Thread.isMainThread ? "main" : "background"
+            Self.logger.info("circuit_breaker.recovery_started thread=\(thread, privacy: .public)")
+            Self.logRecoveryEvent(
+                "circuit_breaker.recovery_started",
+                message: "Auto-recovery initiated for unresponsive AeroSpace",
+                context: ["thread": thread]
+            )
             if Thread.isMainThread {
                 // Main thread: fire-and-forget recovery in the background, fail fast now.
                 // start() blocks for up to ~10s (open + readiness poll) — unacceptable on main.
@@ -827,10 +866,21 @@ public struct ApAeroSpace {
                     break
                 case .recoveredWithoutRestart:
                     Self.logger.info("circuit_breaker.recovery_succeeded_without_restart")
+                    Self.logRecoveryEvent(
+                        "circuit_breaker.recovery_succeeded",
+                        message: "AeroSpace responded to probe — recovered without restart",
+                        context: ["method": "probe_only"]
+                    )
                     circuitBreaker.endRecovery(success: true)
                     return transport.executeAndRecord(arguments: arguments, timeoutSeconds: timeoutSeconds)
                 case .failed(let detail):
                     Self.logger.warning("circuit_breaker.recovery_failed reason=prepare_failed detail=\(detail, privacy: .public)")
+                    Self.logRecoveryEvent(
+                        "circuit_breaker.recovery_failed",
+                        level: .error,
+                        message: "Recovery preparation failed",
+                        context: ["reason": "prepare_failed", "detail": detail]
+                    )
                     circuitBreaker.endRecovery(success: false)
                     return .failure(transport.breakerOpenError(detailOverride: detail))
                 }
@@ -839,10 +889,21 @@ public struct ApAeroSpace {
                 switch start() {
                 case .success:
                     Self.logger.info("circuit_breaker.recovery_succeeded")
+                    Self.logRecoveryEvent(
+                        "circuit_breaker.recovery_succeeded",
+                        message: "AeroSpace restarted successfully",
+                        context: ["method": "restart"]
+                    )
                     circuitBreaker.endRecovery(success: true)
                     return transport.executeAndRecord(arguments: arguments, timeoutSeconds: timeoutSeconds)
                 case .failure:
                     Self.logger.warning("circuit_breaker.recovery_failed")
+                    Self.logRecoveryEvent(
+                        "circuit_breaker.recovery_failed",
+                        level: .error,
+                        message: "AeroSpace restart failed",
+                        context: ["method": "restart"]
+                    )
                     circuitBreaker.endRecovery(success: false)
                 }
             }
@@ -941,10 +1002,21 @@ public struct ApAeroSpace {
             break
         case .recoveredWithoutRestart:
             logger.info("circuit_breaker.recovery_succeeded_without_restart")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_succeeded",
+                message: "AeroSpace responded to probe — recovered without restart (background)",
+                context: ["method": "probe_only", "thread": "background"]
+            )
             circuitBreaker.endRecovery(success: true)
             return
         case .failed(let detail):
             logger.warning("circuit_breaker.recovery_failed reason=prepare_failed detail=\(detail, privacy: .public)")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_failed",
+                level: .error,
+                message: "Recovery preparation failed (background)",
+                context: ["reason": "prepare_failed", "detail": detail, "thread": "background"]
+            )
             circuitBreaker.endRecovery(success: false)
             return
         }
@@ -952,13 +1024,25 @@ public struct ApAeroSpace {
         // Start AeroSpace and wait for readiness (recovery-specific path).
         // Uses off-breaker probes since circuitBreaker.isRecoveryInProgress is true.
         switch commandRunner.run(executable: "open", arguments: ["-a", "AeroSpace"], timeoutSeconds: 10) {
-        case .failure:
+        case .failure(let error):
             logger.warning("circuit_breaker.recovery_failed")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_failed",
+                level: .error,
+                message: "AeroSpace launch command failed (background)",
+                context: ["reason": "launch_failed", "detail": error.message, "thread": "background"]
+            )
             circuitBreaker.endRecovery(success: false)
             return
         case .success(let result):
             guard result.exitCode == 0 else {
                 logger.warning("circuit_breaker.recovery_failed")
+                logRecoveryEvent(
+                    "circuit_breaker.recovery_failed",
+                    level: .error,
+                    message: "AeroSpace launch exited with non-zero code (background)",
+                    context: ["reason": "launch_exit_code", "exit_code": "\(result.exitCode)", "thread": "background"]
+                )
                 circuitBreaker.endRecovery(success: false)
                 return
             }
@@ -968,6 +1052,11 @@ public struct ApAeroSpace {
                 switch commandRunner.run(executable: "aerospace", arguments: ["list-workspaces", "--focused"], timeoutSeconds: 2) {
                 case .success(let r) where r.exitCode == 0:
                     logger.info("circuit_breaker.recovery_succeeded")
+                    logRecoveryEvent(
+                        "circuit_breaker.recovery_succeeded",
+                        message: "AeroSpace restarted successfully (background)",
+                        context: ["method": "restart", "thread": "background"]
+                    )
                     circuitBreaker.endRecovery(success: true)
                     return
                 default:
@@ -975,6 +1064,16 @@ public struct ApAeroSpace {
                 }
             }
             logger.warning("circuit_breaker.recovery_failed")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_failed",
+                level: .error,
+                message: "AeroSpace did not become ready after restart (background)",
+                context: [
+                    "reason": "readiness_timeout",
+                    "timeout_seconds": "\(startupTimeoutSeconds)",
+                    "thread": "background"
+                ]
+            )
             circuitBreaker.endRecovery(success: false)
         }
     }
@@ -986,31 +1085,69 @@ public struct ApAeroSpace {
     ) -> RecoveryPreparationResult {
         guard processChecker.isApplicationRunning(bundleIdentifier: bundleIdentifier) else {
             logger.info("circuit_breaker.recovery_process_not_running")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_process_not_running",
+                message: "AeroSpace process not running, proceeding with restart"
+            )
             return .readyToRestart
         }
 
         switch recoveryProbeResultOffBreaker(commandRunner: commandRunner) {
         case .responsive:
             logger.info("circuit_breaker.recovery_process_responsive")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_process_responsive",
+                message: "AeroSpace process is running and responded to probe"
+            )
             return .recoveredWithoutRestart
         case .failed(let detail):
             logger.warning("circuit_breaker.recovery_probe_failed_non_timeout detail=\(detail, privacy: .public)")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_probe_failed",
+                level: .warn,
+                message: "Recovery probe failed with non-timeout error",
+                context: ["detail": detail]
+            )
             return .failed(detail: detail)
         case .timedOut:
+            logRecoveryEvent(
+                "circuit_breaker.recovery_probe_timed_out",
+                level: .warn,
+                message: "AeroSpace process is running but unresponsive (probe timed out)"
+            )
             break
         }
 
         guard let terminatingChecker else {
             logger.warning("circuit_breaker.recovery_terminate_unsupported")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_terminate_unsupported",
+                level: .error,
+                message: "Cannot terminate unresponsive AeroSpace — process checker does not support termination"
+            )
             return .failed(detail: recoveryTerminateUnsupportedDetail)
         }
 
         logger.info("circuit_breaker.recovery_terminating_unresponsive_process")
+        logRecoveryEvent(
+            "circuit_breaker.recovery_terminating",
+            level: .warn,
+            message: "Terminating unresponsive AeroSpace process before restart"
+        )
         guard terminatingChecker.terminateApplication(bundleIdentifier: bundleIdentifier) else {
             logger.warning("circuit_breaker.recovery_terminate_failed")
+            logRecoveryEvent(
+                "circuit_breaker.recovery_terminate_failed",
+                level: .error,
+                message: "Failed to terminate unresponsive AeroSpace process"
+            )
             return .failed(detail: recoveryTerminateFailedDetail)
         }
 
+        logRecoveryEvent(
+            "circuit_breaker.recovery_terminated",
+            message: "Unresponsive AeroSpace process terminated, proceeding with restart"
+        )
         return .readyToRestart
     }
 
@@ -1131,6 +1268,21 @@ public struct ApAeroSpace {
                 .joined(separator: "\n")
             return .success(output)
         }
+    }
+
+    // MARK: - Structured Recovery Logging
+
+    /// Writes a structured log entry for circuit breaker and recovery events.
+    ///
+    /// Static so it can be called from both instance and static recovery methods.
+    /// Uses the shared `structuredLogger` to write to the JSON log file.
+    private static func logRecoveryEvent(
+        _ event: String,
+        level: LogLevel = .info,
+        message: String? = nil,
+        context: [String: String]? = nil
+    ) {
+        _ = structuredLogger.log(event: event, level: level, message: message, context: context)
     }
 }
 

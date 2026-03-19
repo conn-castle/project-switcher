@@ -171,19 +171,25 @@ extension ProjectManager {
         }
     }
 
-    /// Falls back to focusing a non-project workspace window when the focus stack is exhausted.
+    /// Falls back to focusing a non-project workspace when the focus stack is exhausted.
     ///
-    /// Queries all workspaces and attempts to focus a concrete window in the first
-    /// non-project workspace that has windows. This avoids landing on an empty desktop.
+    /// Strategy (priority order):
+    /// 1. Focus a concrete window in the first non-project workspace that has windows.
+    /// 2. Focus any non-project workspace (even if empty) to leave project space.
+    /// 3. Focus the canonical fallback workspace ("1") as a last resort.
     ///
-    /// - Returns: The workspace name containing the focused window, or nil if no suitable window exists.
+    /// - Returns: The workspace name that was focused, or nil if all attempts failed.
     func fallbackToNonProjectWorkspace() -> String? {
         guard case .success(let workspaces) = aerospace.listWorkspacesWithFocus() else {
+            // AeroSpace unreachable — try the canonical fallback workspace directly.
+            if focusWorkspace(name: WorkspaceRouting.fallbackWorkspace) {
+                return WorkspaceRouting.fallbackWorkspace
+            }
             return nil
         }
         let nonProjectWorkspaces = workspaces.filter { !$0.workspace.hasPrefix(Self.workspacePrefix) }
 
-        // Prefer the first non-project workspace where we can actually focus a window.
+        // 1. Prefer the first non-project workspace where we can actually focus a window.
         for candidate in nonProjectWorkspaces {
             guard case .success(let windows) = aerospace.listWindowsWorkspace(workspace: candidate.workspace),
                   !windows.isEmpty else { continue }
@@ -193,6 +199,19 @@ extension ProjectManager {
             updateMostRecentNonProjectFocus(focused)
             return candidate.workspace
         }
+
+        // 2. Focus any non-project workspace (even empty) to leave project space.
+        for candidate in nonProjectWorkspaces {
+            if focusWorkspace(name: candidate.workspace) {
+                return candidate.workspace
+            }
+        }
+
+        // 3. Last resort: focus the canonical fallback workspace.
+        if focusWorkspace(name: WorkspaceRouting.fallbackWorkspace) {
+            return WorkspaceRouting.fallbackWorkspace
+        }
+
         return nil
     }
 

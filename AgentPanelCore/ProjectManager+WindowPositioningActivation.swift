@@ -339,7 +339,14 @@ extension ProjectManager {
                 logEvent("position.chrome_set_none", level: .warn)
                 warnings.append("Chrome: no windows were positioned")
             } else if result.hasPartialFailure {
-                logEvent("position.chrome_partial", level: .warn, context: ["positioned": "\(result.positioned)", "matched": "\(result.matched)"])
+                var chromePartialContext: [String: String] = [
+                    "positioned": "\(result.positioned)",
+                    "matched": "\(result.matched)"
+                ]
+                if !result.failures.isEmpty {
+                    chromePartialContext["failures"] = result.failures.joined(separator: "; ")
+                }
+                logEvent("position.chrome_partial", level: .warn, context: chromePartialContext)
                 warnings.append("Chrome: positioned \(result.positioned) of \(result.matched) windows")
             } else {
                 logEvent("position.chrome_positioned", context: ["count": "\(result.positioned)"])

@@ -398,6 +398,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let dataStore = DataPaths.default()
+        // Monitor display configuration changes (dock/undock, monitor connect/disconnect).
+        // These events correlate with AeroSpace tree-node bugs and window scrambling.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenParametersDidChange(_:)),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+
         logAppEvent(
             event: "app.started",
             context: [
@@ -1078,11 +1087,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         } else {
+            guard service.status != .notRegistered else { return }
             do {
                 try service.unregister()
                 logAppEvent(event: "launch_at_login.unregistered")
             } catch {
-                // Unregister failure when not registered is expected; only warn if meaningful
                 logAppEvent(
                     event: "launch_at_login.unregister_failed",
                     level: .warn,
@@ -1107,6 +1116,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Called when the app is about to terminate.
     func applicationWillTerminate(_ notification: Notification) {
         logAppEvent(event: "app.terminated")
+    }
+
+    /// Called when display configuration changes (monitor connect/disconnect, dock/undock, resolution change).
+    ///
+    /// Logs the new display state and triggers a health refresh since display changes
+    /// can cause AeroSpace tree-node bugs and window position scrambling.
+    @objc private func screenParametersDidChange(_ notification: Notification) {
+        let screens = NSScreen.screens
+        let screenDescriptions = screens.enumerated().map { index, screen in
+            let name = screen.localizedName
+            let frame = screen.frame
+            let visibleFrame = screen.visibleFrame
+            return "\(index):\(name) \(Int(frame.width))x\(Int(frame.height)) visible=\(Int(visibleFrame.width))x\(Int(visibleFrame.height))"
+        }
+        logAppEvent(
+            event: "display.configuration_changed",
+            context: [
+                "screen_count": "\(screens.count)",
+                "screens": screenDescriptions.joined(separator: "; ")
+            ]
+        )
+        // Trigger health check — display changes can cause AeroSpace state corruption.
+        healthCoordinator?.refreshHealthInBackground(trigger: "display_change")
     }
 
     /// Displays the Doctor report using the DoctorWindowController.
