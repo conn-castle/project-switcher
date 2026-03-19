@@ -6,6 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-03-19
+
+### Added
+
+- **Display configuration change monitoring** -- AgentPanel now detects display configuration changes (dock/undock, monitor connect/disconnect) and triggers a health refresh, since these events correlate with AeroSpace tree-node bugs.
+- **Structured JSON logging** -- added `AgentPanelLogger` with structured JSON logging throughout circuit breaker recovery, config management, executable resolution, close-project, and focus-restore paths with contextual fields (window_id, workspace, project_id, screen dimensions).
+
+### Changed
+
+- **Enhanced recovery coordinator diagnostics** -- recovery coordinator logs now include window_id, workspace, and screen dimensions context; coordinator-unavailable warnings are emitted even after coordinator deallocation.
+- **Extracted `loadBundledConfigContent`** -- AeroSpaceConfigManager resource loading now uses a dedicated method with error logging.
+
+### Fixed
+
+- **Non-project fallback stranding** -- `fallbackToNonProjectWorkspace` now uses a 3-tier fallback (window → empty workspace → canonical "1") to prevent the user from being stranded in a project workspace after close/exit.
+- **Tree-node error recovery for all focus paths** -- `focusWindow()` now retries with `reloadConfig` on tree-node errors as a safety net across all focus paths, not just recovery. A 5-second cooldown prevents repeated config reloads in tight polling loops.
+- **Post-close stale tree nodes** -- `closeProject` now calls `reloadConfig` after closing to flush stale AeroSpace tree nodes before focus restoration.
+- **Capture retry on transient failure** -- `captureCurrentFocus` now retries on transient AeroSpace failures with a breaker-open guard, and skips `Thread.sleep` retry when called on the main thread to avoid blocking UI.
+- **Stale focus history from gone windows** -- focus history entries now include a window-existence check before preservation; gone windows are invalidated immediately instead of being retried.
+- **Skip window capture with no IDE windows** -- `captureWindowPositions` now skips capture when the IDE has no windows, and removes an unreliable `listWindowsForApp` skip guard that could miss windows on secondary monitors.
+- **Login item unregister crash** -- guarded `SMAppService.unregister()` against `.notRegistered` status to prevent errors when the login item was never registered.
+- **Timeout log truncation** -- `ensureWorkspaceFocused` now uses `%.1f` format instead of Int cast so sub-second timeout values are logged correctly.
+- **Weak-self no-op in RecoveryOperationCoordinator** -- logger is now captured directly instead of routing through `self?.logEvent`, ensuring coordinator-unavailable warnings are emitted after deallocation.
+
 ## [0.1.14] - 2026-03-11
 
 ### Changed

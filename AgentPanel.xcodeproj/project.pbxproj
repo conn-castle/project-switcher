@@ -1702,7 +1702,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.14;
+				MARKETING_VERSION = 0.1.15;
 				PRODUCT_BUNDLE_IDENTIFIER = com.agentpanel.AgentPanel;
 				PRODUCT_NAME = AgentPanel;
 				SDKROOT = macosx;
@@ -1777,7 +1777,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.14;
+				MARKETING_VERSION = 0.1.15;
 				PRODUCT_BUNDLE_IDENTIFIER = com.agentpanel.AgentPanel.dev;
 				PRODUCT_NAME = "AgentPanel Dev";
 				SDKROOT = macosx;
@@ -1835,7 +1835,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.14;
+				MARKETING_VERSION = 0.1.15;
 				PRODUCT_BUNDLE_IDENTIFIER = com.agentpanel.AgentPanel;
 				PRODUCT_NAME = AgentPanel;
 				SDKROOT = macosx;
@@ -2122,7 +2122,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.14;
+				MARKETING_VERSION = 0.1.15;
 				PRODUCT_BUNDLE_IDENTIFIER = com.agentpanel.AgentPanel.dev;
 				PRODUCT_NAME = "AgentPanel Dev";
 				SDKROOT = macosx;
