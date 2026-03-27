@@ -69,6 +69,31 @@ final class VSCodeSettingsManagerTests: XCTestCase {
         XCTAssertEqual(endCount, 1)
     }
 
+    func testInjectBlockRemovesLegacyAgentPanelBlock() throws {
+        let content = """
+        {
+          // >>> agent-panel
+          // Managed by AgentPanel. Do not edit this block manually.
+          "window.title": "AP:old-proj - ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+          // <<< agent-panel
+          "editor.fontSize": 14
+        }
+        """
+
+        let result = try PsVSCodeSettingsManager.injectBlock(into: content, identifier: "new-proj").get()
+
+        XCTAssertTrue(result.contains("PS:new-proj"))
+        XCTAssertFalse(result.contains("AP:old-proj"))
+        XCTAssertFalse(result.contains("// >>> agent-panel"))
+        XCTAssertFalse(result.contains("// <<< agent-panel"))
+        XCTAssertTrue(result.contains("\"editor.fontSize\": 14"))
+
+        let startCount = result.components(separatedBy: "// >>> project-switcher").count - 1
+        let endCount = result.components(separatedBy: "// <<< project-switcher").count - 1
+        XCTAssertEqual(startCount, 1)
+        XCTAssertEqual(endCount, 1)
+    }
+
     // MARK: - injectBlock: coexists with agent-layer block
 
     func testInjectBlockCoexistsWithAgentLayerBlock() throws {
@@ -145,6 +170,27 @@ final class VSCodeSettingsManagerTests: XCTestCase {
             XCTFail("Expected failure for unbalanced markers")
         case .failure(let error):
             XCTAssertTrue(error.message.contains("unbalanced"))
+        }
+    }
+
+    func testInjectBlockReturnsErrorWhenOnlyLegacyStartMarkerExists() {
+        let content = """
+        {
+          // >>> agent-panel
+          "window.title": "old value",
+          "editor.fontSize": 14
+        }
+        """
+
+        let result = PsVSCodeSettingsManager.injectBlock(into: content, identifier: "new-proj")
+
+        switch result {
+        case .success:
+            XCTFail("Expected failure for unbalanced legacy markers")
+        case .failure(let error):
+            XCTAssertTrue(error.message.contains("unbalanced"))
+            XCTAssertTrue(error.message.contains("// >>> agent-panel"))
+            XCTAssertTrue(error.message.contains("// <<< agent-panel"))
         }
     }
 

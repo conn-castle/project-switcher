@@ -71,7 +71,7 @@ public struct ConfigFinding: Equatable, Sendable {
 
 /// Loads and parses the ProjectSwitcher configuration file.
 struct ConfigLoader {
-    private static let starterConfigTemplate = """
+    static let starterConfigTemplate = """
 # ProjectSwitcher configuration
 #
 # [app] (optional) — Application settings

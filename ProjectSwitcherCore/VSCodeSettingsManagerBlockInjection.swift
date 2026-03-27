@@ -5,6 +5,14 @@ extension PsVSCodeSettingsManager {
     static let startMarker = "// >>> project-switcher"
     /// End marker for the project-switcher settings block.
     static let endMarker = "// <<< project-switcher"
+    /// Start marker for the legacy agent-panel settings block.
+    private static let legacyStartMarker = "// >>> agent-panel"
+    /// End marker for the legacy agent-panel settings block.
+    private static let legacyEndMarker = "// <<< agent-panel"
+    private static let markerPairs: [(start: String, end: String)] = [
+        (start: startMarker, end: endMarker),
+        (start: legacyStartMarker, end: legacyEndMarker)
+    ]
 
     /// Injects or replaces the project-switcher block at the top of a JSONC settings file.
     ///
@@ -22,19 +30,8 @@ extension PsVSCodeSettingsManager {
     /// - Returns: Updated file content with the project-switcher block injected, or an error
     ///   if the content has no opening `{`.
     static func injectBlock(into content: String, identifier: String, color: String? = nil) -> Result<String, PsCoreError> {
-        let hasStart = content.contains(startMarker)
-        let hasEnd = content.contains(endMarker)
-        if hasStart != hasEnd {
-            return .failure(PsCoreError(
-                category: .validation,
-                message: """
-                Cannot inject settings block: unbalanced project-switcher markers in settings.json.
-                Expected both markers:
-                \(startMarker)
-                \(endMarker)
-                Fix the file manually, then retry.
-                """
-            ))
+        if let markerError = validateMarkers(in: content) {
+            return .failure(markerError)
         }
 
         // Extract existing colorCustomizations before removing the block.
@@ -102,7 +99,11 @@ extension PsVSCodeSettingsManager {
     /// - Parameter lines: Lines of the settings file.
     /// - Returns: A tuple of `(startMarker, endMarker)` line indices, or `nil` if markers
     ///   are missing or in the wrong order.
-    private static func findBlockMarkers(in lines: [String]) -> (startMarker: Int, endMarker: Int)? {
+    private static func findBlockMarkers(
+        in lines: [String],
+        startMarker: String,
+        endMarker: String
+    ) -> (startMarker: Int, endMarker: Int)? {
         guard let startIndex = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == startMarker }),
               let endIndex = lines[lines.index(after: startIndex)...].firstIndex(where: {
                   $0.trimmingCharacters(in: .whitespaces) == endMarker
@@ -113,21 +114,32 @@ extension PsVSCodeSettingsManager {
         return (startIndex, endIndex)
     }
 
+    private static func findBlockMarkers(in lines: [String]) -> (startMarker: Int, endMarker: Int)? {
+        for pair in markerPairs {
+            if let markers = findBlockMarkers(in: lines, startMarker: pair.start, endMarker: pair.end) {
+                return markers
+            }
+        }
+        return nil
+    }
+
     /// Removes an existing project-switcher block (markers + content between them) from the content.
     ///
     /// If the start marker exists but the end marker is missing (unbalanced markers),
     /// returns the content unchanged to prevent data loss.
     private static func removeExistingBlock(from content: String) -> String {
-        let hasStart = content.contains(startMarker)
-        let hasEnd = content.contains(endMarker)
-        guard hasStart && hasEnd else { return content }
+        var lines = content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var removedAnyBlock = false
 
-        let lines = content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        guard let markers = findBlockMarkers(in: lines) else { return content }
+        while let markers = findBlockMarkers(in: lines) {
+            let before = Array(lines[..<markers.startMarker])
+            let after = Array(lines[lines.index(after: markers.endMarker)...])
+            lines = before + after
+            removedAnyBlock = true
+        }
 
-        let before = Array(lines[..<markers.startMarker])
-        let after = Array(lines[lines.index(after: markers.endMarker)...])
-        return (before + after).joined(separator: "\n")
+        guard removedAnyBlock else { return content }
+        return lines.joined(separator: "\n")
     }
 
     /// Extracts the `workbench.colorCustomizations` JSON object value from an existing
@@ -182,5 +194,25 @@ extension PsVSCodeSettingsManager {
             return "\(prefix)\(lastLine),"
         }
         return "\(text),"
+    }
+
+    private static func validateMarkers(in content: String) -> PsCoreError? {
+        for pair in markerPairs {
+            let hasStart = content.contains(pair.start)
+            let hasEnd = content.contains(pair.end)
+            if hasStart != hasEnd {
+                return PsCoreError(
+                    category: .validation,
+                    message: """
+                    Cannot inject settings block: unbalanced managed markers in settings.json.
+                    Expected both markers:
+                    \(pair.start)
+                    \(pair.end)
+                    Fix the file manually, then retry.
+                    """
+                )
+            }
+        }
+        return nil
     }
 }
