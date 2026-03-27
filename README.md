@@ -4,6 +4,9 @@
 
 <h1 align="center">ProjectSwitcher</h1>
 
+> [!WARNING]
+> **This project has been sunset.** Something better may be coming soon from Conn Castle Studios. This repository will remain available, but it is no longer actively maintained.
+
 <p align="center">
 A macOS menu bar app for engineers who work across many repositories.<br>
 One hotkey to switch projects, with your IDE, browser, tabs, and window layout restored automatically.
