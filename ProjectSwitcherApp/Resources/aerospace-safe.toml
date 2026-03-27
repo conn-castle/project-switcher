@@ -1,0 +1,21 @@
+# Managed by ProjectSwitcher - do not edit manually
+# ps-config-version: 3
+# Purpose: AeroSpace sits idle until ProjectSwitcher explicitly controls it.
+# All windows are floating; tiling is disabled. ProjectSwitcher handles
+# workspace-scoped window cycling natively via Option-Tab / Option-Shift-Tab.
+
+config-version = 2
+start-at-login = false
+
+[mode.main.binding]
+# >>> user-keybindings
+# Add your custom keybindings below. ProjectSwitcher preserves this section across updates.
+# <<< user-keybindings
+
+[[on-window-detected]]
+check-further-callbacks = true
+run = 'layout floating'
+
+# >>> user-config
+# Add your custom AeroSpace config below. ProjectSwitcher preserves this section across updates.
+# <<< user-config

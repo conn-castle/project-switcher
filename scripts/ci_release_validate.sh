@@ -10,13 +10,13 @@ set -euo pipefail
 staging_path="$RUNNER_TEMP/staging"
 artifacts_path="$RUNNER_TEMP/artifacts"
 
-dmg="$artifacts_path/AgentPanel-v${VERSION}-macos-arm64.dmg"
-pkg="$artifacts_path/ap-v${VERSION}-macos-arm64.pkg"
-cli="$staging_path/ap"
+dmg="$artifacts_path/ProjectSwitcher-v${VERSION}-macos-arm64.dmg"
+pkg="$artifacts_path/pswitcher-v${VERSION}-macos-arm64.pkg"
+cli="$staging_path/pswitcher"
 
 echo "=== Validating staged app bundle ==="
-codesign --verify --deep --strict --verbose=2 "$staging_path/AgentPanel.app"
-spctl --assess --verbose=4 --type execute "$staging_path/AgentPanel.app"
+codesign --verify --deep --strict --verbose=2 "$staging_path/ProjectSwitcher.app"
+spctl --assess --verbose=4 --type execute "$staging_path/ProjectSwitcher.app"
 
 echo ""
 echo "=== Validating CLI binary ==="
@@ -33,15 +33,15 @@ mkdir -p "$dmg_mount"
 hdiutil attach "$dmg" -mountpoint "$dmg_mount" -nobrowse -readonly -noverify
 trap 'hdiutil detach "$dmg_mount" 2>/dev/null || true' EXIT
 
-if [[ ! -d "$dmg_mount/AgentPanel.app" ]]; then
-  echo "error: AgentPanel.app not found in DMG root" >&2
+if [[ ! -d "$dmg_mount/ProjectSwitcher.app" ]]; then
+  echo "error: ProjectSwitcher.app not found in DMG root" >&2
   echo "DMG contents:"
   ls -la "$dmg_mount/" >&2
   exit 1
 fi
 
-codesign --verify --deep --strict --verbose=2 "$dmg_mount/AgentPanel.app"
-spctl --assess --verbose=4 --type execute "$dmg_mount/AgentPanel.app"
+codesign --verify --deep --strict --verbose=2 "$dmg_mount/ProjectSwitcher.app"
+spctl --assess --verbose=4 --type execute "$dmg_mount/ProjectSwitcher.app"
 
 hdiutil detach "$dmg_mount" 2>/dev/null || true
 trap - EXIT

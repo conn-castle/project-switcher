@@ -64,8 +64,8 @@ if [[ -n "$target" ]]; then
   fi
 fi
 
-if [[ ! -d "AgentPanel.xcodeproj" ]]; then
-  echo "error: AgentPanel.xcodeproj is missing" >&2
+if [[ ! -d "ProjectSwitcher.xcodeproj" ]]; then
+  echo "error: ProjectSwitcher.xcodeproj is missing" >&2
   echo "Fix: scripts/regenerate_xcodeproj.sh" >&2
   exit 1
 fi
@@ -123,7 +123,7 @@ if [[ -n "$target" ]]; then
   fi
 fi
 
-result_bundle_path="build/TestResults/Test-AgentPanel.xcresult"
+result_bundle_path="build/TestResults/Test-ProjectSwitcher.xcresult"
 mkdir -p "$(dirname -- "$result_bundle_path")"
 if [[ -e "$result_bundle_path" ]]; then
   if [[ "$result_bundle_path" != build/TestResults/*.xcresult ]]; then
@@ -136,8 +136,8 @@ fi
 echo "Running $test_desc (Debug)..."
 set +e
 xcodebuild \
-  -project AgentPanel.xcodeproj \
-  -scheme AgentPanel \
+  -project ProjectSwitcher.xcodeproj \
+  -scheme ProjectSwitcher \
   -configuration Debug \
   -destination "platform=macOS" \
   -derivedDataPath "$derived_data_path" \

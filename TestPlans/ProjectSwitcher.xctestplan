@@ -1,0 +1,38 @@
+{
+  "configurations" : [
+    {
+      "id" : "A0B1C2D3-E4F5-6789-ABCD-EF0123456789",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:ProjectSwitcher.xcodeproj",
+        "identifier" : "ProjectSwitcherCoreTests",
+        "name" : "ProjectSwitcherCoreTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:ProjectSwitcher.xcodeproj",
+        "identifier" : "ProjectSwitcherAppTests",
+        "name" : "ProjectSwitcherAppTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:ProjectSwitcher.xcodeproj",
+        "identifier" : "ProjectSwitcherCLITests",
+        "name" : "ProjectSwitcherCLITests"
+      }
+    }
+  ],
+  "version" : 1
+}

@@ -1,15 +1,15 @@
 .PHONY: help setup build build-dev test test-app test-core test-cli test-one coverage clean regen hooks preflight test-coverage-gate
 
 help:
-	@echo "AgentPanel development commands:"
+	@echo "ProjectSwitcher development commands:"
 	@echo ""
 	@echo "  make setup               Validate Xcode toolchain (run once after clone)"
 	@echo "  make build               Build app + CLI (Debug, no code signing)"
 	@echo "  make build-dev           Build dev app identity (Debug, no code signing)"
 	@echo "  make test                Run all tests with coverage collection"
-	@echo "  make test-app            Run AgentPanelAppTests only"
-	@echo "  make test-core           Run AgentPanelCoreTests only"
-	@echo "  make test-cli            Run AgentPanelCLITests only"
+	@echo "  make test-app            Run ProjectSwitcherAppTests only"
+	@echo "  make test-core           Run ProjectSwitcherCoreTests only"
+	@echo "  make test-cli            Run ProjectSwitcherCLITests only"
 	@echo "  make test-one            Run a single test (TARGET=... TEST=...)"
 	@echo "  make coverage            Run tests with coverage gate enforcement"
 	@echo "  make clean               Remove build artifacts"
@@ -31,13 +31,13 @@ test:
 	scripts/test.sh
 
 test-app:
-	scripts/test.sh --target AgentPanelAppTests
+	scripts/test.sh --target ProjectSwitcherAppTests
 
 test-core:
-	scripts/test.sh --target AgentPanelCoreTests
+	scripts/test.sh --target ProjectSwitcherCoreTests
 
 test-cli:
-	scripts/test.sh --target AgentPanelCLITests
+	scripts/test.sh --target ProjectSwitcherCLITests
 
 test-one:
 	@if [ -z "$(TARGET)" ] || [ -z "$(TEST)" ]; then \

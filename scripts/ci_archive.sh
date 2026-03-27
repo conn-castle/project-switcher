@@ -23,7 +23,7 @@ if ! command -v xcbeautify &>/dev/null; then
   exit 1
 fi
 
-archive_path="$RUNNER_TEMP/AgentPanel.xcarchive"
+archive_path="$RUNNER_TEMP/ProjectSwitcher.xcarchive"
 staging_path="$RUNNER_TEMP/staging"
 derived_data_path="build/DerivedData"
 
@@ -38,8 +38,8 @@ echo "Team ID: $team_id"
 # --- Archive ---
 echo "Archiving (Release)..."
 xcodebuild archive \
-  -project AgentPanel.xcodeproj \
-  -scheme AgentPanel \
+  -project ProjectSwitcher.xcodeproj \
+  -scheme ProjectSwitcher \
   -configuration Release \
   -destination "generic/platform=macOS" \
   -archivePath "$archive_path" \
@@ -49,7 +49,7 @@ xcodebuild archive \
 
 # --- Extract app from archive ---
 # The archive stores the app in Products/Applications/
-app_source="$archive_path/Products/Applications/AgentPanel.app"
+app_source="$archive_path/Products/Applications/ProjectSwitcher.app"
 if [[ ! -d "$app_source" ]]; then
   echo "error: app not found at expected archive location" >&2
   echo "Archive Products contents:"
@@ -59,23 +59,23 @@ fi
 
 # --- Stage artifacts ---
 mkdir -p "$staging_path"
-cp -R "$app_source" "$staging_path/AgentPanel.app"
+cp -R "$app_source" "$staging_path/ProjectSwitcher.app"
 
 # --- Re-sign app with Developer ID + hardened runtime + entitlements ---
 # The archive already signed the app, but we re-sign explicitly to ensure
 # the correct identity, hardened runtime, entitlements, and secure timestamp.
 echo "Codesigning app with Developer ID (hardened runtime)..."
 codesign --force --options runtime --timestamp \
-  --entitlements "$repo_root/release/AgentPanel.entitlements" \
+  --entitlements "$repo_root/release/ProjectSwitcher.entitlements" \
   --sign "$DEVELOPER_ID_APP_IDENTITY" \
-  "$staging_path/AgentPanel.app"
-codesign --verify --deep --strict "$staging_path/AgentPanel.app"
+  "$staging_path/ProjectSwitcher.app"
+codesign --verify --deep --strict "$staging_path/ProjectSwitcher.app"
 echo "App signature verified"
 
 # --- Find and codesign CLI binary ---
 cli_candidates=(
-  "$archive_path/Products/usr/local/bin/ap"
-  "$archive_path/Products/usr/bin/ap"
+  "$archive_path/Products/usr/local/bin/pswitcher"
+  "$archive_path/Products/usr/bin/pswitcher"
 )
 cli_source=""
 for candidate in "${cli_candidates[@]}"; do
@@ -86,21 +86,21 @@ for candidate in "${cli_candidates[@]}"; do
 done
 
 if [[ -z "$cli_source" ]]; then
-  echo "error: CLI binary 'ap' not found in archive" >&2
+  echo "error: CLI binary 'pswitcher' not found in archive" >&2
   echo "Searching archive Products directory..."
-  find "$archive_path/Products" -name "ap" -type f 2>/dev/null || true
+  find "$archive_path/Products" -name "pswitcher" -type f 2>/dev/null || true
   exit 1
 fi
 
 echo "Found CLI binary at: $cli_source"
-cp "$cli_source" "$staging_path/ap"
+cp "$cli_source" "$staging_path/pswitcher"
 
 echo "Codesigning CLI binary with hardened runtime..."
 codesign --force --options runtime --timestamp \
   --sign "$DEVELOPER_ID_APP_IDENTITY" \
-  "$staging_path/ap"
-codesign --verify --deep --strict "$staging_path/ap"
+  "$staging_path/pswitcher"
+codesign --verify --deep --strict "$staging_path/pswitcher"
 
 echo "ci_archive: OK"
-echo "App: $staging_path/AgentPanel.app"
-echo "CLI: $staging_path/ap"
+echo "App: $staging_path/ProjectSwitcher.app"
+echo "CLI: $staging_path/pswitcher"

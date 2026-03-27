@@ -1,7 +1,7 @@
-name: AgentPanel
+name: ProjectSwitcher
 
 options:
-  bundleIdPrefix: com.agentpanel
+  bundleIdPrefix: com.projectswitcher
   deploymentTarget:
     macOS: "15.7"
 
@@ -11,153 +11,153 @@ packages:
     exactVersion: 0.4.3
 
 targetTemplates:
-  AgentPanelAppTarget:
+  ProjectSwitcherAppTarget:
     type: application
     platform: macOS
     sources:
-      - path: AgentPanelApp
+      - path: ProjectSwitcherApp
     dependencies:
-      - target: AgentPanelCore
-      - target: AgentPanelAppKit
+      - target: ProjectSwitcherCore
+      - target: ProjectSwitcherAppKit
       - package: TOMLDecoder
     settings:
       base:
-        INFOPLIST_FILE: AgentPanelApp/Info.plist
+        INFOPLIST_FILE: ProjectSwitcherApp/Info.plist
         MARKETING_VERSION: "0.1.15"
         CURRENT_PROJECT_VERSION: 13
-        CODE_SIGN_ENTITLEMENTS: release/AgentPanel.entitlements
+        CODE_SIGN_ENTITLEMENTS: release/ProjectSwitcher.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
 targets:
-  AgentPanel:
+  ProjectSwitcher:
     templates:
-      - AgentPanelAppTarget
+      - ProjectSwitcherAppTarget
     settings:
       base:
-        PRODUCT_NAME: AgentPanel
-        PRODUCT_BUNDLE_IDENTIFIER: com.agentpanel.AgentPanel
+        PRODUCT_NAME: ProjectSwitcher
+        PRODUCT_BUNDLE_IDENTIFIER: com.projectswitcher.ProjectSwitcher
       configs:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: Developer ID Application
           ENABLE_HARDENED_RUNTIME: YES
 
-  AgentPanelDev:
+  ProjectSwitcherDev:
     templates:
-      - AgentPanelAppTarget
+      - ProjectSwitcherAppTarget
     settings:
       base:
-        PRODUCT_NAME: AgentPanel Dev
-        PRODUCT_BUNDLE_IDENTIFIER: com.agentpanel.AgentPanel.dev
+        PRODUCT_NAME: ProjectSwitcher Dev
+        PRODUCT_BUNDLE_IDENTIFIER: com.projectswitcher.ProjectSwitcher.dev
 
-  AgentPanelCore:
+  ProjectSwitcherCore:
     type: framework.static
     platform: macOS
     sources:
-      - path: AgentPanelCore
+      - path: ProjectSwitcherCore
     dependencies:
       - package: TOMLDecoder
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
 
-  AgentPanelAppKit:
+  ProjectSwitcherAppKit:
     type: framework.static
     platform: macOS
     sources:
-      - path: AgentPanelAppKit
+      - path: ProjectSwitcherAppKit
     dependencies:
-      - target: AgentPanelCore
+      - target: ProjectSwitcherCore
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
 
-  AgentPanelCLICore:
+  ProjectSwitcherCLICore:
     type: framework.static
     platform: macOS
     sources:
-      - path: AgentPanelCLICore
+      - path: ProjectSwitcherCLICore
     dependencies:
-      - target: AgentPanelCore
+      - target: ProjectSwitcherCore
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
 
-  AgentPanelCLI:
+  ProjectSwitcherCLI:
     type: tool
     platform: macOS
-    productName: ap
+    productName: pswitcher
     sources:
-      - path: AgentPanelCLI
+      - path: ProjectSwitcherCLI
     dependencies:
-      - target: AgentPanelCLICore
-      - target: AgentPanelCore
-      - target: AgentPanelAppKit
+      - target: ProjectSwitcherCLICore
+      - target: ProjectSwitcherCore
+      - target: ProjectSwitcherAppKit
       - package: TOMLDecoder
     settings:
       base:
-        PRODUCT_NAME: ap
+        PRODUCT_NAME: pswitcher
       configs:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: Developer ID Application
           ENABLE_HARDENED_RUNTIME: YES
 
-  AgentPanelCoreTests:
+  ProjectSwitcherCoreTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: AgentPanelCoreTests
+      - path: ProjectSwitcherCoreTests
     dependencies:
-      - target: AgentPanelCore
-      - target: AgentPanelAppKit
+      - target: ProjectSwitcherCore
+      - target: ProjectSwitcherAppKit
       - package: TOMLDecoder
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-  AgentPanelAppTests:
+  ProjectSwitcherAppTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: AgentPanelAppTests
+      - path: ProjectSwitcherAppTests
     dependencies:
-      - target: AgentPanel
-      - target: AgentPanelCore
-      - target: AgentPanelAppKit
+      - target: ProjectSwitcher
+      - target: ProjectSwitcherCore
+      - target: ProjectSwitcherAppKit
       - package: TOMLDecoder
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-  AgentPanelCLITests:
+  ProjectSwitcherCLITests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: AgentPanelCLITests
+      - path: ProjectSwitcherCLITests
     dependencies:
-      - target: AgentPanelCLICore
-      - target: AgentPanelCore
+      - target: ProjectSwitcherCLICore
+      - target: ProjectSwitcherCore
       - package: TOMLDecoder
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:
-  AgentPanel:
+  ProjectSwitcher:
     build:
       targets:
-        AgentPanel: all
-        AgentPanelCLI: all
-        AgentPanelCoreTests: [test]
+        ProjectSwitcher: all
+        ProjectSwitcherCLI: all
+        ProjectSwitcherCoreTests: [test]
     test:
       testPlans:
-        - path: TestPlans/AgentPanel.xctestplan
+        - path: TestPlans/ProjectSwitcher.xctestplan
           defaultPlan: true
       targets:
-        - name: AgentPanelCoreTests
-        - name: AgentPanelAppTests
-        - name: AgentPanelCLITests
+        - name: ProjectSwitcherCoreTests
+        - name: ProjectSwitcherAppTests
+        - name: ProjectSwitcherCLITests
 
-  AgentPanelDev:
+  ProjectSwitcherDev:
     build:
       targets:
-        AgentPanelDev: all
+        ProjectSwitcherDev: all

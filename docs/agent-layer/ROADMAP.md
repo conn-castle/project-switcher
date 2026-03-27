@@ -12,9 +12,17 @@ A phased plan of work that guides architecture decisions and sequencing. The roa
 - Incomplete phases include **Goal**, **Tasks** (checkbox list), and **Exit criteria** sections.
 - When a phase is complete:
   - update the heading to: `## Phase N ✅ — <phase name>`
-  - replace the phase content with a short bullet summary of what was accomplished (no checkbox list).
+  - replace ALL phase content (Goal, Tasks, Task details, Exit criteria) with a concise bullet summary of what was accomplished (no checkbox list).
+- **Archival:** When more than 5 completed phases exist, consolidate the oldest completed phases into a single `## Archived phases` summary. Keep the 5 most recently completed phases as individual entries. The archive section uses one line per phase.
 
 ### Phase templates
+
+Archived (compact):
+```markdown
+## Archived phases (1–N)
+- Phase 1 — <name>: <one-line summary>
+- Phase 2 — <name>: <one-line summary>
+```
 
 Completed:
 ```markdown
@@ -43,16 +51,16 @@ Incomplete:
 
 <!-- PHASES START -->
 
-## Phase 0 ✅ — AgentPanel reset and cleanup
-- Renamed the app/core targets to AgentPanel and removed the legacy CLI.
+## Phase 0 ✅ — ProjectSwitcher reset and cleanup
+- Renamed the app/core targets to ProjectSwitcher and removed the legacy CLI.
 - Stripped activation/workspace management from the switcher, leaving list + selection logging.
-- Updated paths, logging, and docs to the AgentPanel namespace.
+- Updated paths, logging, and docs to the ProjectSwitcher namespace.
 
 ## Phase 1 ✅ — Foundations: Doctor, config, persistence (UI skeleton)
 - Doctor is 100% functional with checks for Homebrew, AeroSpace, VS Code, Chrome, agent-layer CLI, config validity, and directories.
 - Config loading/validation is exhaustive with actionable errors; schema documented in README.
 - StateStore persistence API implemented with versioned JSON schema, focus stack (LIFO, 20 max, 7-day prune), and lastLaunchedAt.
-- CLI has test coverage for argument parsing and command execution; `ap --version` added.
+- CLI has test coverage for argument parsing and command execution; `pswitcher --version` added.
 - Core interface document (`docs/CORE_API.md`) catalogs all public APIs.
 - Switcher UI skeleton loads config, lists projects, and logs selections.
 
@@ -60,11 +68,11 @@ Incomplete:
 - Focus domain model defined with FocusEvent, FocusEventKind, and SessionManager as the single source of truth for state and focus history.
 - Focus history persisted via StateStore with query, prune, and export capabilities; comprehensive test coverage.
 - Switcher search + sorting rules specified and implemented in ProjectSorter: recency-based ordering, prefix-match prioritization, case-insensitive substring matching.
-- Strict separation of concerns enforced: business logic in AgentPanelCore, presentation in App/CLI.
-- AppKit integration consolidated into shared AgentPanelAppKit module (Core → AppKit → App/CLI layering).
+- Strict separation of concerns enforced: business logic in ProjectSwitcherCore, presentation in App/CLI.
+- AppKit integration consolidated into shared ProjectSwitcherAppKit module (Core → AppKit → App/CLI layering).
 
 ## Phase 3 ✅ — MVP: activation/project lifecycle
-- Activation/project lifecycle API designed and implemented in AgentPanelCore with success/failure states and idempotency.
+- Activation/project lifecycle API designed and implemented in ProjectSwitcherCore with success/failure states and idempotency.
 - Activation orchestration implemented with tests for success, failure, and partial-failure scenarios.
 - "Close project" implemented in core (API complete; UI wiring deferred to Phase 4).
 - "Back to non-project space" implemented — returns focus to most recent non-project window.
@@ -104,7 +112,7 @@ Incomplete:
 - Distribution shape decided: signed + notarized arm64 assets via GitHub tagged releases (Homebrew deferred).
 - Signing + notarization integrated into scripted releases (no manual Xcode GUI steps).
 - Release scripts: `ci_archive.sh`, `ci_package.sh`, `ci_notarize.sh`, `ci_release_validate.sh`, `ci_setup_signing.sh`.
-- README finalized: install (GitHub Releases), permissions, config schema, usage (switcher + `ap`), troubleshooting.
+- README finalized: install (GitHub Releases), permissions, config schema, usage (switcher + `pswitcher`), troubleshooting.
 - CI gates (build + tests) and documented release checklist.
 - Fresh-machine onboarding validated using README + Doctor only.
 
@@ -123,8 +131,8 @@ Incomplete:
 - Support side-by-side dev/release app installs with distinct macOS app identities.
 
 ### Tasks
-- [x] Split dev vs release app identity: add `AgentPanelDev` target/scheme with `PRODUCT_NAME=AgentPanel Dev` and `PRODUCT_BUNDLE_IDENTIFIER=com.agentpanel.AgentPanel.dev`, add `make build-dev`, and keep shared `~/.config/agent-panel` + `~/.local/state/agent-panel` paths.
-- [ ] Implement full best-practices self-update using a framework for AgentPanel app updates (signed update feed, signature verification, staged install/relaunch UX, and explicit failure reporting).
+- [x] Split dev vs release app identity: add `ProjectSwitcherDev` target/scheme with `PRODUCT_NAME=ProjectSwitcher Dev` and `PRODUCT_BUNDLE_IDENTIFIER=com.projectswitcher.ProjectSwitcher.dev`, add `make build-dev`, and keep shared `~/.config/project-switcher` + `~/.local/state/project-switcher` paths.
+- [ ] Implement full best-practices self-update using a framework for ProjectSwitcher app updates (signed update feed, signature verification, staged install/relaunch UX, and explicit failure reporting).
 - [ ] Add update-available signaling in the app UI (menu indicator + latest version detail + update action entry point).
 - [x] Auto recover a single window.
 - [x] Get auto recovery for project working when not on project; recover non-project windows on the current desktop.
@@ -151,7 +159,7 @@ Incomplete:
 - [ ] Custom IDE support: config `[[ide]]` blocks (app path, bundle id, etc) and project `ide = "vscode" | "<custom>"`.
 - [ ] Better integration with existing AeroSpace config (non-destructive merge; avoid overwriting).
 - [ ] Chrome visual differentiation matching VS Code project color: Apply project color to the Chrome window to visually match the associated VS Code window. Possible approaches: Chrome profile customization, theme injection, or Chrome extension. Deferred from Phase 7 — Chrome has no clean programmatic injection point for color theming (unlike VS Code's Peacock extension). May require a custom Chrome extension or Chrome profile switching.
-- [ ] Hot Corners and trackpad activation/switching: Add support for Hot Corners and trackpad gestures (e.g., specific swipes) to trigger the project switcher or quickly toggle between recent projects. Streamlines navigation for laptop users who prefer gesture-based interaction over keyboard shortcuts. User can configure a specific screen corner or trackpad gesture in the settings to invoke the AgentPanel switcher.
+- [ ] Hot Corners and trackpad activation/switching: Add support for Hot Corners and trackpad gestures (e.g., specific swipes) to trigger the project switcher or quickly toggle between recent projects. Streamlines navigation for laptop users who prefer gesture-based interaction over keyboard shortcuts. User can configure a specific screen corner or trackpad gesture in the settings to invoke the ProjectSwitcher switcher.
 - [ ] Homebrew packaging for app + CLI: Provide optional Homebrew distribution (cask/formula or unified strategy) on top of GitHub tagged release assets. A documented Homebrew install/upgrade path exists and is validated against release artifacts. Deferred intentionally while release work focuses on signed + notarized arm64 GitHub tagged releases.
 
 ### Exit criteria

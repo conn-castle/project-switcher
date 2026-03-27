@@ -1,6 +1,6 @@
-# AgentPanelCore Public API
+# ProjectSwitcherCore Public API
 
-The public API of `AgentPanelCore` has these main concerns:
+The public API of `ProjectSwitcherCore` has these main concerns:
 
 1. **ProjectManager** — Project listing, sorting, selection, and focus management
 2. **Doctor** — Diagnostics and remediation
@@ -24,8 +24,8 @@ The public API of `AgentPanelCore` has these main concerns:
 ## Version & Identity
 
 ```swift
-public enum AgentPanel {
-    /// Human-readable app name for user-facing guidance (e.g., "AgentPanel", "AgentPanel Dev").
+public enum ProjectSwitcher {
+    /// Human-readable app name for user-facing guidance (e.g., "ProjectSwitcher", "ProjectSwitcher Dev").
     public static var displayName: String
 
     /// Current version string (e.g., "1.0.0").
@@ -36,7 +36,7 @@ public enum AgentPanel {
 ## Errors
 
 ```swift
-public enum ApCoreErrorCategory: String, Sendable {
+public enum PsCoreErrorCategory: String, Sendable {
     case command
     case validation
     case fileSystem
@@ -46,25 +46,25 @@ public enum ApCoreErrorCategory: String, Sendable {
     case system
 }
 
-public enum ApCoreErrorReason: String, Sendable {
+public enum PsCoreErrorReason: String, Sendable {
     case circuitBreakerOpen
     case commandTimeout
     case windowTokenNotFound
     case windowInventoryEmpty
 }
 
-public struct ApCoreError: Error, Equatable, Sendable {
+public struct PsCoreError: Error, Equatable, Sendable {
     public let message: String
-    public let reason: ApCoreErrorReason?
+    public let reason: PsCoreErrorReason?
 
     /// Full init with structured error fields.
     public init(
-        category: ApCoreErrorCategory,
+        category: PsCoreErrorCategory,
         message: String,
         detail: String? = nil,
         command: String? = nil,
         exitCode: Int32? = nil,
-        reason: ApCoreErrorReason? = nil
+        reason: PsCoreErrorReason? = nil
     )
 
     /// Convenience classifier for breaker-open errors.
@@ -209,8 +209,8 @@ flow (see `docs/using_aerospace.md` § "Project Activation Command Sequence"):
 
 ```swift
 public final class ProjectManager {
-    /// Prefix for all AgentPanel workspaces.
-    public static let workspacePrefix: String  // "ap-"
+    /// Prefix for all ProjectSwitcher workspaces.
+    public static let workspacePrefix: String  // "ps-"
 
     /// Called when the project list changes after a config load.
     /// Fires on first load (nil → projects) and on subsequent loads when the project list differs.
@@ -219,7 +219,7 @@ public final class ProjectManager {
     /// All projects from config, or empty if config not loaded.
     public var projects: [ProjectConfig] { get }
 
-    /// Returns open + focused AgentPanel workspace state from one AeroSpace query.
+    /// Returns open + focused ProjectSwitcher workspace state from one AeroSpace query.
     public func workspaceState() -> Result<ProjectWorkspaceState, ProjectError>
 
     /// Creates a ProjectManager with default dependencies.
@@ -437,7 +437,7 @@ public struct Doctor {
 
 public struct DoctorMetadata: Equatable, Sendable {
     public let timestamp: String
-    public let agentPanelVersion: String
+    public let projectSwitcherVersion: String
     public let macOSVersion: String
     public let aerospaceApp: String
     public let aerospaceCli: String
@@ -516,41 +516,41 @@ public protocol FocusCycleStatusProviding {
 
 Window positioning protocols are defined in Core using Foundation/CG types.
 Concrete implementations (`AXWindowPositioner`, `ScreenModeDetector`) live in the
-`AgentPanelAppKit` module since Core cannot import AppKit.
+`ProjectSwitcherAppKit` module since Core cannot import AppKit.
 
 ### Protocols
 
 ```swift
 public protocol WindowPositioning {
-    func getPrimaryWindowFrame(bundleId: String, projectId: String) -> Result<CGRect, ApCoreError>
+    func getPrimaryWindowFrame(bundleId: String, projectId: String) -> Result<CGRect, PsCoreError>
     func setWindowFrames(
         bundleId: String,
         projectId: String,
         primaryFrame: CGRect,
         cascadeOffsetPoints: CGFloat
-    ) -> Result<WindowPositionResult, ApCoreError>
-    func getFallbackWindowFrame(bundleId: String) -> Result<CGRect, ApCoreError>
+    ) -> Result<WindowPositionResult, PsCoreError>
+    func getFallbackWindowFrame(bundleId: String) -> Result<CGRect, PsCoreError>
     func setFallbackWindowFrames(
         bundleId: String,
         primaryFrame: CGRect,
         cascadeOffsetPoints: CGFloat
-    ) -> Result<WindowPositionResult, ApCoreError>
+    ) -> Result<WindowPositionResult, PsCoreError>
     func recoverWindow(
         bundleId: String,
         windowTitle: String,
         screenVisibleFrame: CGRect
-    ) -> Result<RecoveryOutcome, ApCoreError>
+    ) -> Result<RecoveryOutcome, PsCoreError>
     func recoverFocusedWindow(
         bundleId: String,
         screenVisibleFrame: CGRect
-    ) -> Result<RecoveryOutcome, ApCoreError>
+    ) -> Result<RecoveryOutcome, PsCoreError>
     func isAccessibilityTrusted() -> Bool
     func promptForAccessibility() -> Bool
 }
 
 public protocol ScreenModeDetecting {
-    func detectMode(containingPoint: CGPoint, threshold: Double) -> Result<ScreenMode, ApCoreError>
-    func physicalWidthInches(containingPoint: CGPoint) -> Result<Double, ApCoreError>
+    func detectMode(containingPoint: CGPoint, threshold: Double) -> Result<ScreenMode, PsCoreError>
+    func physicalWidthInches(containingPoint: CGPoint) -> Result<Double, PsCoreError>
     func screenVisibleFrame(containingPoint: CGPoint) -> CGRect?
 }
 ```
@@ -692,31 +692,31 @@ public final class WindowRecoveryManager {
     public init(
         windowPositioner: WindowPositioning,
         screenVisibleFrame: CGRect,
-        logger: AgentPanelLogging,
+        logger: ProjectSwitcherLogging,
         processChecker: RunningApplicationChecking? = nil,
         screenModeDetector: ScreenModeDetecting? = nil,
         layoutConfig: LayoutConfig = LayoutConfig(),
         knownProjectIds: Set<String>? = nil
     )
 
-    /// Recovers windows in a workspace. For project workspaces (`ap-<projectId>`),
+    /// Recovers windows in a workspace. For project workspaces (`ps-<projectId>`),
     /// applies workspace-scoped layout positioning for IDE/Chrome first (only targeting
     /// apps present in the workspace), then generic shrink/center recovery for remaining windows.
     /// Returns `.failure` when the workspace cannot be focused or listed.
-    public func recoverWorkspaceWindows(workspace: String) async -> Result<RecoveryResult, ApCoreError>
+    public func recoverWorkspaceWindows(workspace: String) async -> Result<RecoveryResult, PsCoreError>
 
     /// Recovers a single focused window in the given workspace.
     /// Returns `.failure` when the workspace cannot be focused or listed, the window is missing,
     /// or AX recovery cannot locate/recover the window.
-    public func recoverCurrentWindow(windowId: Int, workspace: String) -> Result<RecoveryOutcome, ApCoreError>
+    public func recoverCurrentWindow(windowId: Int, workspace: String) -> Result<RecoveryOutcome, PsCoreError>
 
     /// Recovers all windows across all workspaces, reporting progress.
-    /// Windows tagged with `AP:<projectId>` for known configured projects are moved to
-    /// `ap-<projectId>` first, then each affected workspace is recovered
+    /// Windows tagged with `PS:<projectId>` for known configured projects are moved to
+    /// `ps-<projectId>` first, then each affected workspace is recovered
     /// (layout-aware in project workspaces).
     public func recoverAllWindows(
         progress: @escaping (_ current: Int, _ total: Int) -> Void
-    ) async -> Result<RecoveryResult, ApCoreError>
+    ) async -> Result<RecoveryResult, PsCoreError>
 }
 ```
 
@@ -744,11 +744,11 @@ Structured error context used by auto-doctor to trigger background diagnostics.
 
 ```swift
 public struct ErrorContext: Equatable, Sendable {
-    public let category: ApCoreErrorCategory
+    public let category: PsCoreErrorCategory
     public let message: String
     public let trigger: String
 
-    public init(category: ApCoreErrorCategory, message: String, trigger: String)
+    public init(category: PsCoreErrorCategory, message: String, trigger: String)
 
     /// True for errors that should auto-show Doctor results (e.g., AeroSpace failures).
     public var isCritical: Bool { get }
@@ -760,7 +760,7 @@ public struct ErrorContext: Equatable, Sendable {
 ## Logging
 
 ```swift
-public protocol AgentPanelLogging {
+public protocol ProjectSwitcherLogging {
     func log(
         event: String,
         level: LogLevel,
@@ -769,7 +769,7 @@ public protocol AgentPanelLogging {
     ) -> Result<Void, LogWriteError>
 }
 
-extension AgentPanelLogging {
+extension ProjectSwitcherLogging {
     public func log(payload: LogEventPayload) -> Result<Void, LogWriteError>
 }
 
@@ -791,12 +791,12 @@ public struct LogEventPayload: Equatable, Sendable {
     )
 }
 
-public struct AgentPanelLogger {
+public struct ProjectSwitcherLogger {
     public init()
     public init(dataStore: DataPaths)
 }
 
-extension AgentPanelLogger: AgentPanelLogging {
+extension ProjectSwitcherLogger: ProjectSwitcherLogging {
     public func log(
         event: String,
         level: LogLevel = .info,
@@ -845,11 +845,11 @@ public struct WindowCycler {
     }
 
     public init(processChecker: RunningApplicationChecking? = nil)
-    public func startSession(direction: CycleDirection) -> Result<CycleSession?, ApCoreError>
+    public func startSession(direction: CycleDirection) -> Result<CycleSession?, PsCoreError>
     public func advanceSelection(session: CycleSession, direction: CycleDirection) -> CycleSession
-    public func commitSelection(session: CycleSession) -> Result<Void, ApCoreError>
-    public func cancelSession(session: CycleSession) -> Result<Void, ApCoreError>
-    public func cycleFocus(direction: CycleDirection) -> Result<WindowCycleCandidate?, ApCoreError>
+    public func commitSelection(session: CycleSession) -> Result<Void, PsCoreError>
+    public func cancelSession(session: CycleSession) -> Result<Void, PsCoreError>
+    public func cycleFocus(direction: CycleDirection) -> Result<WindowCycleCandidate?, PsCoreError>
 }
 ```
 
@@ -868,7 +868,7 @@ For first-launch setup, the App uses these types directly.
 ### AeroSpace
 
 ```swift
-public struct ApAeroSpace {
+public struct PsAeroSpace {
     /// AeroSpace app bundle identifier.
     public static let bundleIdentifier: String  // "bobko.aerospace"
 
@@ -901,41 +901,41 @@ public struct ApAeroSpace {
     public func isCliAvailable() -> Bool
 
     /// Installs AeroSpace via Homebrew.
-    public func installViaHomebrew() -> Result<Void, ApCoreError>
+    public func installViaHomebrew() -> Result<Void, PsCoreError>
 
     /// Starts AeroSpace.
     /// Must be called off the main thread.
-    public func start() -> Result<Void, ApCoreError>
+    public func start() -> Result<Void, PsCoreError>
 }
 ```
 
 #### Internal AeroSpace Operations (used by ProjectManager)
 
-These methods are internal to `AgentPanelCore` and not part of the public API. They are
+These methods are internal to `ProjectSwitcherCore` and not part of the public API. They are
 documented here because they implement the activation command sequence.
 
 ```swift
 // Window resolution — global search with fallback to focused monitor.
 // Matches: aerospace list-windows --app-bundle-id <id> --format <fmt>
 //          || aerospace list-windows --monitor focused --app-bundle-id <id> --format <fmt>
-func listWindowsForApp(bundleId: String) -> Result<[ApWindow], ApCoreError>
+func listWindowsForApp(bundleId: String) -> Result<[PsWindow], PsCoreError>
 
 // Workspace summary query (single call for all + focused metadata).
 // Matches: aerospace list-workspaces --all --format "%{workspace}||%{workspace-is-focused}"
-func listWorkspacesWithFocus() -> Result<[ApWorkspaceSummary], ApCoreError>
+func listWorkspacesWithFocus() -> Result<[PsWorkspaceSummary], PsCoreError>
 
 // Workspace focus — summon-workspace with fallback to workspace.
 // Matches: aerospace summon-workspace <name>
 //          || aerospace workspace <name>
-func focusWorkspace(name: String) -> Result<Void, ApCoreError>
+func focusWorkspace(name: String) -> Result<Void, PsCoreError>
 
 // Move window with optional focus-follows.
 // Matches: aerospace move-node-to-workspace [--focus-follows-window] --window-id <id> <ws>
-func moveWindowToWorkspace(workspace: String, windowId: Int, focusFollows: Bool) -> Result<Void, ApCoreError>
+func moveWindowToWorkspace(workspace: String, windowId: Int, focusFollows: Bool) -> Result<Void, PsCoreError>
 
 // Focused window query (used for stability polling).
 // Matches: aerospace list-windows --focused --format <fmt>
-func focusedWindow() -> Result<ApWindow, ApCoreError>
+func focusedWindow() -> Result<PsWindow, PsCoreError>
 ```
 
 ### AeroSpace Config Manager
@@ -943,7 +943,7 @@ func focusedWindow() -> Result<ApWindow, ApCoreError>
 ```swift
 public enum AeroSpaceConfigStatus: String, Sendable {
     case missing
-    case managedByAgentPanel
+    case managedByProjectSwitcher
     case externalConfig
     case unknown
 }
@@ -960,12 +960,12 @@ public struct AeroSpaceConfigManager {
 
     public init()
 
-    public func writeSafeConfig() -> Result<Void, ApCoreError>
+    public func writeSafeConfig() -> Result<Void, PsCoreError>
     public func configContents() -> String?
     public func configStatus() -> AeroSpaceConfigStatus
     public func templateVersion() -> Int?
     public func currentConfigVersion() -> Int?
-    public func updateManagedConfig() -> Result<Void, ApCoreError>
-    public func ensureUpToDate() -> Result<ConfigUpdateResult, ApCoreError>
+    public func updateManagedConfig() -> Result<Void, PsCoreError>
+    public func ensureUpToDate() -> Result<ConfigUpdateResult, PsCoreError>
 }
 ```

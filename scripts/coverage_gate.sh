@@ -22,13 +22,13 @@ if ! command -v xcrun >/dev/null 2>&1; then
 fi
 
 # Single source of truth for the coverage policy:
-# - The UI app (AgentPanel.app) is presentation code; coverage gating focuses on non-UI targets.
-# - AgentPanelAppKit contains system-level code (AX APIs, NSScreen, CGDisplay) that requires
+# - The UI app (ProjectSwitcher.app) is presentation code; coverage gating focuses on non-UI targets.
+# - ProjectSwitcherAppKit contains system-level code (AX APIs, NSScreen, CGDisplay) that requires
 #   a live window server and connected displays — not exercisable in CI unit tests.
 min_percent="90"
 targets=(
-  "AgentPanelCore.framework"
-  "AgentPanelCLICore.framework"
+  "ProjectSwitcherCore.framework"
+  "ProjectSwitcherCLICore.framework"
 )
 
 swift_args=(

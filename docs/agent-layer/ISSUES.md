@@ -16,7 +16,7 @@ Deferred defects, maintainability refactors, technical debt, risks, and engineer
 
 ### Entry template
 ```text
-- Issue YYYY-MM-DD abcdef: Short title
+- Issue YYYY-MM-DD short-slug: Short title
     Priority: Critical | High | Medium | Low. Area: <area>
     Description: <observed problem or risk>
     Next step: <smallest concrete next action>
@@ -29,5 +29,5 @@ Deferred defects, maintainability refactors, technical debt, risks, and engineer
 
 - Issue 2026-03-09 testgap: Missing unit tests for new extraction/refactor surfaces
     Priority: Medium. Area: tests
-    Description: Several refactored or newly extracted methods lack direct unit test coverage: `retryTransientWindowOp` (retry+fallback logic), `AeroSpaceCircuitBreaker.beginRecovery` 60s stuck-recovery timeout, `listAllWindows` infrastructure error propagation (circuitBreakerOpen/timeout), `ProjectError.userFacingMessage`, `performBackgroundBreakerRecovery` readiness polling, `restoreNonProjectFocusFromStack` multi-candidate loop, `ApAeroSpace.focusWindow` tree-node error retry path, `closeProject` post-close `reloadConfig` call verification, and `captureWindowPositions` skip-on-no-IDE-windows guard.
+    Description: Several refactored or newly extracted methods lack direct unit test coverage: `retryTransientWindowOp` (retry+fallback logic), `AeroSpaceCircuitBreaker.beginRecovery` 60s stuck-recovery timeout, `listAllWindows` infrastructure error propagation (circuitBreakerOpen/timeout), `ProjectError.userFacingMessage`, `performBackgroundBreakerRecovery` readiness polling, `restoreNonProjectFocusFromStack` multi-candidate loop, `PsAeroSpace.focusWindow` tree-node error retry path, `closeProject` post-close `reloadConfig` call verification, and `captureWindowPositions` skip-on-no-IDE-windows guard.
     Next step: Add focused unit tests for `retryTransientWindowOp` covering immediate success, transient retry, fallback invocation, and permanent failure paths.

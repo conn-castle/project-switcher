@@ -99,10 +99,10 @@ jobs:
         run: scripts/ci_package.sh
 
       - name: Notarize DMG
-        run: scripts/ci_notarize.sh "$RUNNER_TEMP/artifacts/AgentPanel-v${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
+        run: scripts/ci_notarize.sh "$RUNNER_TEMP/artifacts/ProjectSwitcher-v${{ steps.version.outputs.VERSION }}-macos-arm64.dmg"
 
       - name: Notarize PKG
-        run: scripts/ci_notarize.sh "$RUNNER_TEMP/artifacts/ap-v${{ steps.version.outputs.VERSION }}-macos-arm64.pkg"
+        run: scripts/ci_notarize.sh "$RUNNER_TEMP/artifacts/pswitcher-v${{ steps.version.outputs.VERSION }}-macos-arm64.pkg"
 
       - name: Validate artifacts
         env:
@@ -113,9 +113,9 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/artifacts"
           shasum -a 256 \
-            "AgentPanel-v${{ steps.version.outputs.VERSION }}-macos-arm64.dmg" \
-            "ap-v${{ steps.version.outputs.VERSION }}-macos-arm64.pkg" \
-            "ap-v${{ steps.version.outputs.VERSION }}-macos-arm64.tar.gz" \
+            "ProjectSwitcher-v${{ steps.version.outputs.VERSION }}-macos-arm64.dmg" \
+            "pswitcher-v${{ steps.version.outputs.VERSION }}-macos-arm64.pkg" \
+            "pswitcher-v${{ steps.version.outputs.VERSION }}-macos-arm64.tar.gz" \
             > SHA256SUMS
           cat SHA256SUMS
 
@@ -126,11 +126,11 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           TAG="${{ steps.version.outputs.TAG }}"
           gh release create "$TAG" \
-            --title "AgentPanel $TAG" \
+            --title "ProjectSwitcher $TAG" \
             --generate-notes \
-            "$RUNNER_TEMP/artifacts/AgentPanel-v${VERSION}-macos-arm64.dmg" \
-            "$RUNNER_TEMP/artifacts/ap-v${VERSION}-macos-arm64.pkg" \
-            "$RUNNER_TEMP/artifacts/ap-v${VERSION}-macos-arm64.tar.gz" \
+            "$RUNNER_TEMP/artifacts/ProjectSwitcher-v${VERSION}-macos-arm64.dmg" \
+            "$RUNNER_TEMP/artifacts/pswitcher-v${VERSION}-macos-arm64.pkg" \
+            "$RUNNER_TEMP/artifacts/pswitcher-v${VERSION}-macos-arm64.tar.gz" \
             "$RUNNER_TEMP/artifacts/SHA256SUMS"
 
       - name: Cleanup signing material

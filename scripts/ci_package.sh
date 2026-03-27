@@ -7,7 +7,7 @@ set -euo pipefail
 #   DEVELOPER_ID_APP_IDENTITY       — for DMG codesigning
 #   DEVELOPER_ID_INSTALLER_IDENTITY — for PKG signing
 #   VERSION                         — e.g. "0.1.0"
-#   CLI_INSTALL_PATH                — e.g. "/usr/local/bin/ap"
+#   CLI_INSTALL_PATH                — e.g. "/usr/local/bin/pswitcher"
 #   RUNNER_TEMP
 
 staging_path="$RUNNER_TEMP/staging"
@@ -16,12 +16,12 @@ artifacts_path="$RUNNER_TEMP/artifacts"
 mkdir -p "$artifacts_path"
 
 # --- Validate inputs ---
-if [[ ! -d "$staging_path/AgentPanel.app" ]]; then
-  echo "error: staged app not found at $staging_path/AgentPanel.app" >&2
+if [[ ! -d "$staging_path/ProjectSwitcher.app" ]]; then
+  echo "error: staged app not found at $staging_path/ProjectSwitcher.app" >&2
   exit 1
 fi
-if [[ ! -x "$staging_path/ap" ]]; then
-  echo "error: staged CLI binary not found at $staging_path/ap" >&2
+if [[ ! -x "$staging_path/pswitcher" ]]; then
+  echo "error: staged CLI binary not found at $staging_path/pswitcher" >&2
   exit 1
 fi
 if [[ -z "${CLI_INSTALL_PATH:-}" ]]; then
@@ -39,26 +39,26 @@ if ! command -v create-dmg &>/dev/null; then
 fi
 
 # --- DMG ---
-dmg_name="AgentPanel-v${VERSION}-macos-arm64.dmg"
+dmg_name="ProjectSwitcher-v${VERSION}-macos-arm64.dmg"
 echo "Creating DMG: $dmg_name"
 
 # create-dmg expects a source directory; it copies the directory's contents into the DMG.
-# Stage the .app inside a temp directory so the DMG root contains AgentPanel.app.
+# Stage the .app inside a temp directory so the DMG root contains ProjectSwitcher.app.
 dmg_source="$RUNNER_TEMP/dmg-source"
 rm -rf "$dmg_source"
 mkdir -p "$dmg_source"
-cp -R "$staging_path/AgentPanel.app" "$dmg_source/AgentPanel.app"
+cp -R "$staging_path/ProjectSwitcher.app" "$dmg_source/ProjectSwitcher.app"
 
 # create-dmg returns exit code 2 when it successfully creates the DMG but
 # cannot set a custom icon (common in headless CI). Accept 0 and 2 as success
 # when the output file exists.
 dmg_exit=0
 create-dmg \
-  --volname "AgentPanel" \
+  --volname "ProjectSwitcher" \
   --window-pos 200 120 \
   --window-size 600 400 \
   --icon-size 100 \
-  --icon "AgentPanel.app" 150 190 \
+  --icon "ProjectSwitcher.app" 150 190 \
   --app-drop-link 450 190 \
   --no-internet-enable \
   "$artifacts_path/$dmg_name" \
@@ -84,7 +84,7 @@ codesign --force --timestamp \
   "$artifacts_path/$dmg_name"
 
 # --- PKG ---
-pkg_name="ap-v${VERSION}-macos-arm64.pkg"
+pkg_name="pswitcher-v${VERSION}-macos-arm64.pkg"
 echo "Creating PKG: $pkg_name"
 
 # Determine install directory and binary name from CLI_INSTALL_PATH
@@ -95,13 +95,13 @@ install_bin=$(basename "$CLI_INSTALL_PATH")
 pkg_root="$RUNNER_TEMP/pkg-root"
 rm -rf "$pkg_root"
 mkdir -p "$pkg_root/$install_dir"
-cp "$staging_path/ap" "$pkg_root/$install_dir/$install_bin"
+cp "$staging_path/pswitcher" "$pkg_root/$install_dir/$install_bin"
 
 # Create unsigned component package
-unsigned_pkg="$RUNNER_TEMP/ap-unsigned.pkg"
+unsigned_pkg="$RUNNER_TEMP/pswitcher-unsigned.pkg"
 pkgbuild \
   --root "$pkg_root" \
-  --identifier "com.agentpanel.cli" \
+  --identifier "com.projectswitcher.cli" \
   --version "$VERSION" \
   --install-location "/" \
   "$unsigned_pkg"
@@ -116,9 +116,9 @@ productsign \
 rm -f "$unsigned_pkg"
 
 # --- Tarball ---
-tarball_name="ap-v${VERSION}-macos-arm64.tar.gz"
+tarball_name="pswitcher-v${VERSION}-macos-arm64.tar.gz"
 echo "Creating tarball: $tarball_name"
-tar -czf "$artifacts_path/$tarball_name" -C "$staging_path" ap
+tar -czf "$artifacts_path/$tarball_name" -C "$staging_path" pswitcher
 
 echo "ci_package: OK"
 echo "DMG: $artifacts_path/$dmg_name"

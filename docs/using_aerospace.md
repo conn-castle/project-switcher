@@ -188,13 +188,13 @@ If your habit is `list-windows --all`, switch to:
 3. `--workspace visible` (everything you can currently see)
 4. `--monitor focused` (current monitor only)
 
-Then add `--app-bundle-id` / `--pid`, and use `--format` to output only what you need. In AgentPanel, this remains the default guidance for ad-hoc queries; the project activation path is an explicit exception (see below). ([Nikita Bobko][1])
+Then add `--app-bundle-id` / `--pid`, and use `--format` to output only what you need. In ProjectSwitcher, this remains the default guidance for ad-hoc queries; the project activation path is an explicit exception (see below). ([Nikita Bobko][1])
 
 ---
 
 # Project Activation Command Sequence
 
-This section documents the exact AeroSpace commands and sequencing used by the proven activation flow (reference: `AgentPanelCore/ProjectManager.swift` and `AgentPanelCore/AeroSpace/ApAeroSpace.swift`). The Swift implementation must mirror this sequence.
+This section documents the exact AeroSpace commands and sequencing used by the proven activation flow (reference: `ProjectSwitcherCore/ProjectManager.swift` and `ProjectSwitcherCore/AeroSpace/PsAeroSpace.swift`). The Swift implementation must mirror this sequence.
 
 ## Overview
 
@@ -212,7 +212,7 @@ Fields are separated by `||` (double pipe). Parsing splits on `||` to extract: w
 
 ## Window token
 
-Each project window is tagged with `AP:<project-id>` in the window title. Chrome uses AppleScript `given name`; VS Code uses a `// >>> agent-panel` block in `.vscode/settings.json` with `window.title` containing the token (for SSH projects, the file is written on the remote host via SSH).
+Each project window is tagged with `PS:<project-id>` in the window title. Chrome uses AppleScript `given name`; VS Code uses a `// >>> project-switcher` block in `.vscode/settings.json` with `window.title` containing the token (for SSH projects, the file is written on the remote host via SSH).
 
 ## Step 1: Find or launch tagged windows
 
@@ -240,7 +240,7 @@ Launch with tab URLs (single AppleScript, no placeholder):
 tell application "Google Chrome"
   set newWindow to make new window
   set URL of active tab of newWindow to "<first-tab-url>"
-  set given name of newWindow to "AP:<project-id>"
+  set given name of newWindow to "PS:<project-id>"
   -- additional tabs opened via `make new tab` with each URL
 end tell
 ```
@@ -251,19 +251,19 @@ If the tab-restore launch fails, Chrome falls back to launching without tabs (em
 
 If no tagged VS Code window exists:
 
-1. Inject a `// >>> agent-panel` block into the project's `.vscode/settings.json`:
+1. Inject a `// >>> project-switcher` block into the project's `.vscode/settings.json`:
 
 ```jsonc
 {
-  // >>> agent-panel
-  // Managed by AgentPanel. Do not edit this block manually.
-  "window.title": "AP:<project-id> - ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
-  // <<< agent-panel
+  // >>> project-switcher
+  // Managed by ProjectSwitcher. Do not edit this block manually.
+  "window.title": "PS:<project-id> - ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+  // <<< project-switcher
   // ... rest of file preserved ...
 }
 ```
 
-   The block is always inserted at the top of the file (right after `{`). Existing content is preserved. If the file doesn't exist, it is created with the block. If an existing `// >>> agent-panel` block exists, it is replaced.
+   The block is always inserted at the top of the file (right after `{`). Existing content is preserved. If the file doesn't exist, it is created with the block. If an existing `// >>> project-switcher` block exists, it is replaced.
 
 2. Launch:
    - **Direct projects:** `code --new-window <project-path>`

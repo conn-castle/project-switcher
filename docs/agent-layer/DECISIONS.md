@@ -17,7 +17,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
 
 ### Entry template
 ```text
-- Decision YYYY-MM-DD abcdef: Short title
+- Decision YYYY-MM-DD short-slug: Short title
     Decision: <what was chosen>
     Reason: <why it was chosen>
     Tradeoffs: <what is gained and what is lost>
@@ -28,12 +28,12 @@ A rolling log of important, non-obvious decisions that materially affect future 
 <!-- ENTRIES START -->
 
 - Decision 2026-02-23 focushistory: Persist non-project focus history for cross-process restore
-    Decision: Persist focus stack + most recent non-project focus in `~/.local/state/agent-panel/state.json` via `FocusHistoryStore`, with versioned schema, 7-day prune, and serialized persistence queue.
+    Decision: Persist focus stack + most recent non-project focus in `~/.local/state/project-switcher/state.json` via `FocusHistoryStore`, with versioned schema, 7-day prune, and serialized persistence queue.
     Reason: Exit/close focus restoration was unreliable across app/CLI sessions and restarts; persisted history is the single source of truth for restoring the last non-project window.
     Tradeoffs: Adds disk writes on focus updates; future state extensions must be versioned to avoid breaking older reads.
 
 - Decision 2026-02-03 guipath: GUI apps and child processes require PATH augmentation
-    Decision: Use `ExecutableResolver` for finding executables and `ApSystemCommandRunner` for propagating an augmented PATH to child processes. Both merge standard search paths with the user's login shell PATH (via `$SHELL -l -c <command>`, validated as absolute path, falls back to `/bin/zsh`). Fish shell is detected via `$SHELL` path suffix and uses `string join : $PATH` for colon-delimited output.
+    Decision: Use `ExecutableResolver` for finding executables and `PsSystemCommandRunner` for propagating an augmented PATH to child processes. Both merge standard search paths with the user's login shell PATH (via `$SHELL -l -c <command>`, validated as absolute path, falls back to `/bin/zsh`). Fish shell is detected via `$SHELL` path suffix and uses `string join : $PATH` for colon-delimited output.
     Reason: macOS GUI apps launched via Finder/Dock inherit a minimal PATH missing Homebrew and user additions. Child processes (e.g., `al` calling `code`) inherit the same minimal PATH and fail. `/usr/bin/env` is not viable.
     Tradeoffs: Login shell spawn at init (~50ms, cached). Shells other than bash, zsh, and fish are untested (safe fallback to standard paths).
 
@@ -48,29 +48,29 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Snapshot may overlap with always-open config; harmless since the snapshot IS the intended tab state.
 
 - Decision 2026-02-09 allauncher: Agent Layer VS Code launch uses `al sync` + `al vscode --no-sync --new-window`
-    Decision: For `useAgentLayer = true`, AgentPanel runs `al sync` (CWD = project path) then `al vscode --no-sync --new-window` (CWD = project path, no positional path so "." maps to repo root). This preserves Agent Layer env vars like `CODEX_HOME` while avoiding the upstream dual-window bug (`al vscode` appends "." to `code` args in `internal/clients/vscode/launch.go`). Window identification uses a `// >>> agent-panel` block in `.vscode/settings.json` (see `vscodesettings` decision).
+    Decision: For `useAgentLayer = true`, ProjectSwitcher runs `al sync` (CWD = project path) then `al vscode --no-sync --new-window` (CWD = project path, no positional path so "." maps to repo root). This preserves Agent Layer env vars like `CODEX_HOME` while avoiding the upstream dual-window bug (`al vscode` appends "." to `code` args in `internal/clients/vscode/launch.go`). Window identification uses a `// >>> project-switcher` block in `.vscode/settings.json` (see `vscodesettings` decision).
     Reason: Direct `code --new-window <path>` (original workaround) lost `CODEX_HOME`. Using `al vscode` without a positional path avoids the dual-window bug while keeping Agent Layer env vars.
     Tradeoffs: Relies on `al vscode` continuing to append "."; upstream fix is still desirable so path-based launches do not open two windows.
 
 - Decision 2026-02-10 vscodesettings: VS Code window title via settings.json block (replaces workspace files)
-    Decision: Inject a `// >>> agent-panel` / `// <<< agent-panel` marker block into the project's `.vscode/settings.json` with `window.title = "AP:<id> - ..."`. Block is always inserted at the top of the file (right after `{`) with trailing comma. For SSH projects, write settings.json on the remote via SSH (read → injectBlock → base64 → write). If SSH write fails, project activation fails loudly (no workspace fallback). Doctor verifies the block exists on SSH remotes (WARN if missing).
-    Reason: Eliminates overhead of separate workspace files per project and the `~/.local/state/agent-panel/vscode/` directory. Settings.json blocks coexist with Agent Layer's `// >>> agent-layer` markers since `al sync` preserves content outside its own markers.
+    Decision: Inject a `// >>> project-switcher` / `// <<< project-switcher` marker block into the project's `.vscode/settings.json` with `window.title = "PS:<id> - ..."`. Block is always inserted at the top of the file (right after `{`) with trailing comma. For SSH projects, write settings.json on the remote via SSH (read → injectBlock → base64 → write). If SSH write fails, project activation fails loudly (no workspace fallback). Doctor verifies the block exists on SSH remotes (WARN if missing).
+    Reason: Eliminates overhead of separate workspace files per project and the `~/.local/state/project-switcher/vscode/` directory. Settings.json blocks coexist with Agent Layer's `// >>> agent-layer` markers since `al sync` preserves content outside its own markers.
     Tradeoffs: Trailing commas in JSONC are valid but may confuse strict JSON parsers. SSH remote write requires SSH access; unreachable SSH hosts prevent activation until connectivity/permissions are restored.
 
 - Decision 2026-02-10 proactive-settings: Settings.json blocks written proactively on config load (superseded by `reactsettings`)
-    Decision: After loading config on startup, the app proactively calls `ApVSCodeSettingsManager.ensureAllSettingsBlocks(projects:)` in the background to write settings.json blocks for all projects (local via file system, SSH via SSH commands). Failures are logged at warn level and do not block config load. Launchers still write during activation as an idempotent safety net.
-    Reason: Settings blocks must exist before VS Code opens the project (for reliable window identification), not just when AgentPanel activates it. Proactive writing early in app startup reduces "first activate" flakiness and keeps manual VS Code opens consistent.
+    Decision: After loading config on startup, the app proactively calls `PsVSCodeSettingsManager.ensureAllSettingsBlocks(projects:)` in the background to write settings.json blocks for all projects (local via file system, SSH via SSH commands). Failures are logged at warn level and do not block config load. Launchers still write during activation as an idempotent safety net.
+    Reason: Settings blocks must exist before VS Code opens the project (for reliable window identification), not just when ProjectSwitcher activates it. Proactive writing early in app startup reduces "first activate" flakiness and keeps manual VS Code opens consistent.
     Tradeoffs: SSH write adds latency to background startup work (bounded by 10s timeout per SSH call, 2 calls per SSH project). Unreachable SSH hosts will log warnings but not block app startup.
 
 - Decision 2026-02-10 covgate: Coverage gate enforced via scripts/test.sh
-    Decision: `scripts/test.sh` enables code coverage and enforces a 90% minimum line-coverage gate on non-UI targets (`AgentPanelCore`, `AgentPanelCLICore`) via `scripts/coverage_gate.sh`. `AgentPanelAppKit` is excluded because it contains system-level code (AX APIs, NSScreen, CGDisplay) that requires a live window server — not exercisable in CI unit tests. A repo-managed git pre-commit hook (installed via `scripts/install_git_hooks.sh`) also runs `scripts/test.sh`.
+    Decision: `scripts/test.sh` enables code coverage and enforces a 90% minimum line-coverage gate on non-UI targets (`ProjectSwitcherCore`, `ProjectSwitcherCLICore`) via `scripts/coverage_gate.sh`. `ProjectSwitcherAppKit` is excluded because it contains system-level code (AX APIs, NSScreen, CGDisplay) that requires a live window server — not exercisable in CI unit tests. A repo-managed git pre-commit hook (installed via `scripts/install_git_hooks.sh`) also runs `scripts/test.sh`.
     Reason: Deterministic quality bar for core/business logic; presentation/UI code and system integration code are intentionally not gated.
     Tradeoffs: UI and AppKit target coverage is not enforced; developers must install git hooks locally (CI still enforces).
 
 - Decision 2026-02-12 windowlayout: Window positioning uses AX APIs with Core/AppKit protocol layering
     Decision: Window positioning protocols (WindowPositioning, ScreenModeDetecting) are defined in Core using only Foundation/CG types. Concrete implementations (AXWindowPositioner, ScreenModeDetector) live in AppKit module. ProjectManager accepts them as optional init params from App/CLI callers.
     Reason: Core cannot import AppKit. Protocols with Foundation/CG types allow business logic (layout engine, position store, config validation) to stay in Core and be fully unit-testable, while AX/NSScreen code stays in AppKit.
-    Tradeoffs: AppKit code (~350 lines) is not coverage-gated (requires live window server). AgentPanelAppKit excluded from coverage gate.
+    Tradeoffs: AppKit code (~350 lines) is not coverage-gated (requires live window server). ProjectSwitcherAppKit excluded from coverage gate.
 
 - Decision 2026-02-12 axprompt: Accessibility prompt via Doctor button only (not app launch, superseded by `axstartupbuild`)
     Decision: Do not auto-prompt for Accessibility permission on app launch. Instead, Doctor shows a "Request Accessibility" button when the check is FAIL.
@@ -93,19 +93,19 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Chrome windows have no visual color correlation with their project. Users must rely on tab content to identify project Chrome windows.
 
 - Decision 2026-02-14 circuitbreaker: AeroSpace CLI circuit breaker prevents timeout cascades
-    Decision: `AeroSpaceCircuitBreaker` (process-wide shared instance) sits between `ApAeroSpace` and `CommandRunning`. All `aerospace` CLI calls go through `runAerospace()`, which checks the breaker before spawning a process. On timeout, the breaker trips to "open" state for a 30s cooldown; subsequent calls fail immediately with a descriptive error. `start()` resets the breaker after a fresh AeroSpace launch.
+    Decision: `AeroSpaceCircuitBreaker` (process-wide shared instance) sits between `PsAeroSpace` and `CommandRunning`. All `aerospace` CLI calls go through `runAerospace()`, which checks the breaker before spawning a process. On timeout, the breaker trips to "open" state for a 30s cooldown; subsequent calls fail immediately with a descriptive error. `start()` resets the breaker after a fresh AeroSpace launch.
     Reason: When AeroSpace crashes or its socket becomes unresponsive, every CLI call times out at 5s. With 15-20 calls in a Doctor check, this creates a ~90s freeze. The circuit breaker detects the first timeout and immediately fails the rest.
     Tradeoffs: A single transient timeout trips the breaker for 30s, potentially blocking legitimate calls. After cooldown, the next call acts as a probe to re-verify connectivity.
 
 - Decision 2026-02-14 aeroconfigown: AeroSpace config full ownership with versioned template and user sections
-    Decision: AgentPanel fully owns `~/.aerospace.toml` via a versioned template (`# ap-config-version: N`). On startup, `ensureUpToDate()` compares the installed config version against the template version and auto-updates if stale, preserving user content between `# >>> user-keybindings` / `# <<< user-keybindings` and `# >>> user-config` / `# <<< user-config` markers. After a successful update, AeroSpace is reloaded via `aerospace reload-config` so the running process picks up changes. Pre-migration configs (no version/markers) are updated with default placeholders. Missing template version is a hard failure (fail loudly).
+    Decision: ProjectSwitcher fully owns `~/.aerospace.toml` via a versioned template (`# ps-config-version: N`). On startup, `ensureUpToDate()` compares the installed config version against the template version and auto-updates if stale, preserving user content between `# >>> user-keybindings` / `# <<< user-keybindings` and `# >>> user-config` / `# <<< user-config` markers. After a successful update, AeroSpace is reloaded via `aerospace reload-config` so the running process picks up changes. Pre-migration configs (no version/markers) are updated with default placeholders. Missing template version is a hard failure (fail loudly).
     Reason: Previous approach only wrote the config once during onboarding. Template changes (new keybindings, config options) left users on stale configs with no auto-update path. Doctor detected stale keybindings but the fix was manual.
-    Tradeoffs: Users must place custom config within the marker sections; content outside markers is overwritten on update. The version bump requires incrementing the `# ap-config-version` line in `aerospace-safe.toml`.
+    Tradeoffs: Users must place custom config within the marker sections; content outside markers is overwritten on update. The version bump requires incrementing the `# ps-config-version` line in `aerospace-safe.toml`.
 
 - Decision 2026-02-14 floatingfocusfix: Native Swift window cycling replaces AeroSpace dfs-next/dfs-prev
     Decision: Option-Tab / Option-Shift-Tab is handled natively in Swift via `WindowCycler` (Core) and `FocusCycleHotkeyManager` (App, Carbon API). WindowCycler calls `focusedWindow()` → `listWindowsWorkspace()` → `focusWindow()` to cycle through all workspace windows with wrapping. AeroSpace config template (v3) no longer contains alt-tab keybindings; Doctor keybinding check removed.
-    Reason: AeroSpace's DFS traversal (`rootTilingContainer.allLeafWindowsRecursive`) does not include floating windows, and all windows are floating in AgentPanel's managed config. An intermediate script-based approach was rejected because Swift code is easier to test, maintain, and debug than shell scripts invoked via `exec-and-forget`.
-    Tradeoffs: Carbon global hotkeys require the app to be running (acceptable — AgentPanel is a background agent). Supersedes decisions `workspacetab` and the intermediate script approach.
+    Reason: AeroSpace's DFS traversal (`rootTilingContainer.allLeafWindowsRecursive`) does not include floating windows, and all windows are floating in ProjectSwitcher's managed config. An intermediate script-based approach was rejected because Swift code is easier to test, maintain, and debug than shell scripts invoked via `exec-and-forget`.
+    Tradeoffs: Carbon global hotkeys require the app to be running (acceptable — ProjectSwitcher is a background agent). Supersedes decisions `workspacetab` and the intermediate script approach.
 
 - Decision 2026-02-15 autorecovery: Auto-recovery restarts AeroSpace when circuit breaker trips on a crashed process (superseded by `autorecovery-probe-terminate`)
     Decision: Historical behavior (now superseded) checked only whether AeroSpace was running via `RunningApplicationChecking`; if the process was dead it called `start()` and retried the original command (max 2 recovery attempts per breaker trip). Main-thread callers got immediate breaker error with fire-and-forget async recovery; off-main callers recovered synchronously and retried.
@@ -117,9 +117,9 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Reason: Fish shell's `echo $PATH` emits space-separated entries, which the downstream consumer (`buildAugmentedEnvironment`) splits on `:`, producing one invalid entry. Using a fish-native command avoids post-hoc parsing.
     Tradeoffs: False positive requires a non-fish binary at a path ending in `/fish` — extremely narrow. Most likely `string join` is not found (exit 127) and `runLoginShellCommand` returns nil (same safe fallback). In the unlikely case the binary exits 0 with non-empty output, the output is accepted as a PATH string; invalid entries are harmless noise since standard paths and process PATH are always present.
 
-- Decision 2026-02-15 peacockanchor: workbench.colorCustomizations anchor in agent-panel block
-    Decision: When a project has a color, the agent-panel settings.json block now includes `"workbench.colorCustomizations": {}` as an anchor. On re-injection, existing Peacock-written content inside that object is extracted and preserved. Trailing commas are added only when content follows the block (not when the block is the last element in the JSON).
-    Reason: Peacock writes `workbench.colorCustomizations` via VS Code's config API, which appends the key after the last JSON property. If the last property is inside the `// >>> agent-layer` block, Peacock's colors land there and get stripped when `al sync` runs. The anchor ensures Peacock writes in-place inside the agent-panel block (safe from agent-layer).
+- Decision 2026-02-15 peacockanchor: workbench.colorCustomizations anchor in project-switcher block
+    Decision: When a project has a color, the project-switcher settings.json block now includes `"workbench.colorCustomizations": {}` as an anchor. On re-injection, existing Peacock-written content inside that object is extracted and preserved. Trailing commas are added only when content follows the block (not when the block is the last element in the JSON).
+    Reason: Peacock writes `workbench.colorCustomizations` via VS Code's config API, which appends the key after the last JSON property. If the last property is inside the `// >>> agent-layer` block, Peacock's colors land there and get stripped when `al sync` runs. The anchor ensures Peacock writes in-place inside the project-switcher block (safe from agent-layer).
     Tradeoffs: Settings.json blocks with color now have 3 properties instead of 2. Brace-depth parsing for extraction is basic (no string-aware escaping) but sufficient since Peacock only writes hex color values.
 
 - Decision 2026-02-15 dualsignal: Workspace focus verification uses dual-signal check
@@ -128,7 +128,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: `focusWorkspace` is always called at least once per activation (even if already on the correct workspace). This is a no-op in practice and adds negligible latency (<50ms). The `focusedWindow()` call adds one extra AeroSpace CLI invocation per poll iteration.
 
 - Decision 2026-02-15 recoverylayout: Window recovery uses computed layout, not saved positions
-    Decision: `recoverWorkspaceWindows` applies layout-aware positioning for project workspaces (`ap-<projectId>`) using `WindowLayoutEngine.computeLayout()` with current config. Saved positions from `WindowPositionStore` are deliberately ignored during recovery.
+    Decision: `recoverWorkspaceWindows` applies layout-aware positioning for project workspaces (`ps-<projectId>`) using `WindowLayoutEngine.computeLayout()` with current config. Saved positions from `WindowPositionStore` are deliberately ignored during recovery.
     Reason: Recovery is a "repair to known-good baseline" operation. Saved positions can be stale, misaligned, or the cause of the problem being recovered from. Computed layout from config provides a deterministic, canonical baseline.
     Tradeoffs: Users who had manually positioned windows and then recover will get the computed default layout, not their custom positions. This is the intended behavior — recovery is a reset, not a restore.
 
@@ -144,7 +144,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
 
 - Decision 2026-02-17 ide-frame-retry: IDE frame read retries up to 10x before failing
     Decision: `positionWindows()` retries `getPrimaryWindowFrame()` up to 10 times at `windowPollInterval` (~100ms) when the AX title token isn't found. Retry is in ProjectManager (not AXWindowPositioner) to keep the positioner stateless.
-    Reason: VS Code updates window titles asynchronously after launch. The AX API reads the title before VS Code applies the `AP:<projectId>` setting ~5.5% of the time. A brief retry brings this close to 0%.
+    Reason: VS Code updates window titles asynchronously after launch. The AX API reads the title before VS Code applies the `PS:<projectId>` setting ~5.5% of the time. A brief retry brings this close to 0%.
     Tradeoffs: Up to ~1s additional delay in the worst case (title never appears), but normal case resolves in 1-2 retries (~200ms). Retry interval is injectable via `windowPollInterval` for fast tests.
 
 - Decision 2026-02-17 hotkey-debounce: 300ms debounce on switcher hotkey
@@ -158,18 +158,18 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Negligible — one extra string comparison per tick.
 
 - Decision 2026-02-16 ghrelease-arm64: Distribution shifts to GitHub tagged arm64 releases
-    Decision: AgentPanel distribution is now signed + notarized arm64 artifacts published on GitHub tagged releases. Homebrew distribution is deferred to backlog work.
+    Decision: ProjectSwitcher distribution is now signed + notarized arm64 artifacts published on GitHub tagged releases. Homebrew distribution is deferred to backlog work.
     Reason: This keeps release operations focused on a single packaging path needed now, while preserving deterministic installs/upgrades through versioned release assets.
     Tradeoffs: Intel macOS is unsupported. Users do not get package-manager install/upgrade ergonomics until Homebrew support is implemented.
 
 - Decision 2026-02-17 releaseci: Single-job release workflow with script-based signing and packaging (historical; superseded by `ci26baseline` / `xcode26canonical`)
-    Decision: At the time, release workflow used a single CI job on `macos-15` with 5 scripts (`ci_setup_signing`, `ci_archive`, `ci_package`, `ci_notarize`, `ci_release_validate`) + `ci_preflight` (runs in CI on every push). Entitlements file committed at `release/AgentPanel.entitlements`. Release config signing settings in `project.yml` (Manual style, Developer ID Application identity, hardened runtime) — Debug builds remain unsigned. Current baseline is tracked in `ci26baseline` and `xcode26canonical`.
+    Decision: At the time, release workflow used a single CI job on `macos-15` with 5 scripts (`ci_setup_signing`, `ci_archive`, `ci_package`, `ci_notarize`, `ci_release_validate`) + `ci_preflight` (runs in CI on every push). Entitlements file committed at `release/ProjectSwitcher.entitlements`. Release config signing settings in `project.yml` (Manual style, Developer ID Application identity, hardened runtime) — Debug builds remain unsigned. Current baseline is tracked in `ci26baseline` and `xcode26canonical`.
     Reason: Single job avoids artifact transfer overhead between jobs. Scripts follow existing `scripts/` convention and are locally testable.
     Tradeoffs: Long single job (~15-20 min) vs parallel jobs. CLI tarball is not notarized (tarballs cannot be stapled; users must clear quarantine manually).
 
-- Decision 2026-02-18 cached-env: ApSystemCommandRunner caches augmented environment globally
-    Decision: Replaced per-instance `augmentedEnvironment` with a `static let cachedEnvironment` on `ApSystemCommandRunner`. The environment is computed lazily on first `run()` call (not during `init()`). All instances share the cached value. `buildAugmentedEnvironment(resolver:)` remains a static method for direct test use.
-    Reason: Nine `ApSystemCommandRunner` instances are created on the main thread during app startup (via `ProjectManager`, `ApAeroSpace`, `WindowCycler`, etc.). Each previously spawned a login shell process (up to 7s blocking per instance), freezing the system for 5-10+ seconds total. The login shell PATH doesn't change during app lifetime, so computing it once eliminates all redundant work.
+- Decision 2026-02-18 cached-env: PsSystemCommandRunner caches augmented environment globally
+    Decision: Replaced per-instance `augmentedEnvironment` with a `static let cachedEnvironment` on `PsSystemCommandRunner`. The environment is computed lazily on first `run()` call (not during `init()`). All instances share the cached value. `buildAugmentedEnvironment(resolver:)` remains a static method for direct test use.
+    Reason: Nine `PsSystemCommandRunner` instances are created on the main thread during app startup (via `ProjectManager`, `PsAeroSpace`, `WindowCycler`, etc.). Each previously spawned a login shell process (up to 7s blocking per instance), freezing the system for 5-10+ seconds total. The login shell PATH doesn't change during app lifetime, so computing it once eliminates all redundant work.
     Tradeoffs: All instances share the same environment (no per-instance customization). In practice, all production instances used the default `ExecutableResolver()`, so this is a no-op change. Tests call `buildAugmentedEnvironment` directly with custom resolvers, bypassing the cache.
 
 - Decision 2026-02-18 menu-cache: Menu uses cached workspace state instead of live AeroSpace CLI calls
@@ -178,7 +178,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Menu shows slightly stale data (from last background refresh) instead of live state. In practice, the cache is refreshed frequently enough (every Doctor run, every switcher session, every menu open) that staleness is minimal.
 
 - Decision 2026-02-18 timeout-eof-skip: Skip pipe EOF waits after command timeout
-    Decision: When `ApSystemCommandRunner.run()` times out and terminates the process, skip the 2s+2s pipe EOF semaphore waits and immediately clean up handlers. EOF waits are only performed on normal (non-timeout) process exit.
+    Decision: When `PsSystemCommandRunner.run()` times out and terminates the process, skip the 2s+2s pipe EOF semaphore waits and immediately clean up handlers. EOF waits are only performed on normal (non-timeout) process exit.
     Reason: After a 5s AeroSpace CLI timeout, the additional 4s of EOF waiting stretched total latency to ~9-10s. Since the output is discarded on timeout anyway, there's no reason to wait for it. This halved worst-case latency for timeout paths.
     Tradeoffs: None meaningful — timed-out output was always discarded. Edge case: if a process writes valid output after being terminated but before pipes close, that data is now lost. This is acceptable because we never use output from timed-out commands.
 
@@ -193,7 +193,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Remote SSH hosts (WAN, high latency) may false-fail if connection takes >2s. If users need longer timeouts for remote hosts, this would need to become configurable. Current use case is exclusively LAN.
 
 - Decision 2026-02-18 cli-build-version: CLI version embedded via buildVersion constant
-    Decision: `AgentPanel.version` falls back to a `buildVersion` string constant in `Identity.swift` when `Bundle.main.infoDictionary` is nil (CLI tool context). CI preflight verifies `buildVersion` matches `MARKETING_VERSION` in `project.yml`.
+    Decision: `ProjectSwitcher.version` falls back to a `buildVersion` string constant in `Identity.swift` when `Bundle.main.infoDictionary` is nil (CLI tool context). CI preflight verifies `buildVersion` matches `MARKETING_VERSION` in `project.yml`.
     Reason: CLI tools (`type: tool` in XcodeGen) have no Info.plist bundle. `Bundle.main.infoDictionary` returns nil, causing the version to fall back to `"0.0.0-dev"`. The constant provides correct version reporting without build scripts or generated files.
     Tradeoffs: Requires updating two locations when bumping the version (project.yml + Identity.swift). CI preflight catches mismatches automatically.
 
@@ -213,7 +213,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Log entries are significantly larger (~2-4KB per Doctor run). Acceptable for a diagnostic tool that runs infrequently.
 
 - Decision 2026-02-20 capture-on-switch: Capture window positions during project-to-project switching (partially superseded by `token-fallback-skip-save`)
-    Decision: `selectProject()` now calls `captureWindowPositions(sourceProjectId)` at the start when `preCapturedFocus.workspace` starts with `"ap-"`. Source project ID is extracted from the workspace name using the existing `projectId(fromWorkspace:)` helper. At the time, `SavedWindowFrames.chrome` was made optional (`SavedFrame?`) so Chrome frame read failures could persist IDE-only snapshots.
+    Decision: `selectProject()` now calls `captureWindowPositions(sourceProjectId)` at the start when `preCapturedFocus.workspace` starts with `"ps-"`. Source project ID is extracted from the workspace name using the existing `projectId(fromWorkspace:)` helper. At the time, `SavedWindowFrames.chrome` was made optional (`SavedFrame?`) so Chrome frame read failures could persist IDE-only snapshots.
     Reason: `captureWindowPositions()` was only called from `closeProject()` and `exitToNonProjectWindow()`, never during the most common workflow (project-to-project switching via the switcher). This meant window positions were never persisted during normal use, causing every return to a project to use computed layout instead of the user's manual arrangement.
     Tradeoffs: One extra `captureWindowPositions()` call per project switch (non-fatal, ~10ms). Later work (`token-fallback-skip-save`, 2026-03-02) replaced partial-save behavior with retry/fallback and skip-save to preserve prior complete snapshots.
 
@@ -243,7 +243,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Carbon hotkey/modifier wiring is difficult to simulate deterministically in unit tests, so end-to-end overlay behavior still relies on integration/manual verification. Polling adds a small periodic check while the overlay is active and requires careful lifecycle cleanup to avoid stale timers.
 
 - Decision 2026-02-21 doctor-release-parity: Doctor rendering uses explicit palette and release workflow enforces Xcode 17+ (superseded by `ci26baseline` / `xcode26canonical`)
-    Decision: Doctor rich-text rendering moved to AgentPanelAppKit with explicit RGB palettes (light/dark) and report-background coordination, and release CI now fails when the selected Xcode major version is below 17.
+    Decision: Doctor rich-text rendering moved to ProjectSwitcherAppKit with explicit RGB palettes (light/dark) and report-background coordination, and release CI now fails when the selected Xcode major version is below 17.
     Reason: Signed release artifacts built with older toolchains showed Doctor reports as visually blank while logs and copy actions proved report generation was correct; explicit palette/background pairing removes dynamic-color ambiguity, and the Xcode guard prevents shipping on the known-bad toolchain path.
     Tradeoffs: Release workflow may block until CI runners provide Xcode 17+; Doctor colors are now app-defined tokens instead of dynamic system semantic colors.
 
@@ -253,7 +253,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: `macos-26` is a public-preview image today, so queueing/runner-image instability risk is higher than GA images until GitHub promotes it.
 
 - Decision 2026-02-21 axstartupbuild: Accessibility prompt runs on startup once per build (supersedes `axprompt`)
-    Decision: If Accessibility is not trusted, AgentPanel requests permission once per installed build (`CFBundleVersion`) during startup. The Doctor "Request Accessibility" action remains available as a manual retry path.
+    Decision: If Accessibility is not trusted, ProjectSwitcher requests permission once per installed build (`CFBundleVersion`) during startup. The Doctor "Request Accessibility" action remains available as a manual retry path.
     Reason: Startup prompting gives a better first-run UX for window layout features and reduces the chance users stay in a degraded state because they never open Doctor.
     Tradeoffs: First launch of a new build can show a modal system prompt; users who dismiss still need Doctor or System Settings for a later retry.
 
@@ -263,7 +263,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Historical entries remain for auditability, so readers must treat superseded wording as non-authoritative.
 
 - Decision 2026-02-23 workspacerouting: Canonical WorkspaceRouting utility owns workspace naming and non-project destination strategy
-    Decision: `WorkspaceRouting` enum in Core owns the `"ap-"` project prefix, project-ID extraction, and a `preferredNonProjectWorkspace(from:hasWindows:)` strategy that prefers a non-project workspace with windows, then any non-project workspace, then `"1"` as fallback. `ProjectManager` and `WindowRecoveryManager` delegate to it instead of defining their own constants and logic.
+    Decision: `WorkspaceRouting` enum in Core owns the `"ps-"` project prefix, project-ID extraction, and a `preferredNonProjectWorkspace(from:hasWindows:)` strategy that prefers a non-project workspace with windows, then any non-project workspace, then `"1"` as fallback. `ProjectManager` and `WindowRecoveryManager` delegate to it instead of defining their own constants and logic.
     Reason: Workspace prefix was duplicated across two modules; move/recovery flows hardcoded workspace `"1"` while other flows used dynamic discovery, creating inconsistent behavior.
     Tradeoffs: `moveWindowFromProject` now makes additional AeroSpace CLI calls (workspace listing + per-workspace window listing) to discover the destination. In practice this is 1-3 extra calls for typical setups.
 
@@ -278,12 +278,12 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Adds one extra `focusedWindow` call per poll loop iteration and slightly more branching in focus loops, but removes timeout-boundary flakiness and keeps behavior deterministic.
 
 - Decision 2026-02-28 dev-app-identity: Dev app uses distinct bundle identity while sharing config/state paths
-    Decision: Add a separate `AgentPanelDev` app target/scheme with `PRODUCT_BUNDLE_IDENTIFIER=com.agentpanel.AgentPanel.dev` and `PRODUCT_NAME=AgentPanel Dev`, while keeping existing `AgentPanel` release identity unchanged and continuing to use shared `~/.config/agent-panel` and `~/.local/state/agent-panel` paths.
+    Decision: Add a separate `ProjectSwitcherDev` app target/scheme with `PRODUCT_BUNDLE_IDENTIFIER=com.projectswitcher.ProjectSwitcher.dev` and `PRODUCT_NAME=ProjectSwitcher Dev`, while keeping existing `ProjectSwitcher` release identity unchanged and continuing to use shared `~/.config/project-switcher` and `~/.local/state/project-switcher` paths.
     Reason: macOS Accessibility/Automation permissions are keyed by app identity, so dev and release need distinct bundle IDs for side-by-side installation without collisions; config/state should remain single-source-of-truth across both variants.
     Tradeoffs: Dev and release share persisted state/logs and can influence each other’s history; login-item and UserDefaults behavior is identity-scoped and may differ between variants by design.
 
 - Decision 2026-02-28 recover-all-routing: Recover-all routes project-tagged windows before workspace recovery
-    Decision: `WindowRecoveryManager.recoverAllWindows` now scans every window, moves `AP:<projectId>` VS Code/Chrome windows for known configured projects into `ap-<projectId>` when misplaced, then runs workspace recovery for each affected workspace (layout-aware for project workspaces, generic for non-project workspaces).
+    Decision: `WindowRecoveryManager.recoverAllWindows` now scans every window, moves `PS:<projectId>` VS Code/Chrome windows for known configured projects into `ps-<projectId>` when misplaced, then runs workspace recovery for each affected workspace (layout-aware for project workspaces, generic for non-project workspaces).
     Reason: Global recovery previously forced all windows into one non-project workspace, which broke project workspace layout semantics and failed to repair misplaced project windows back to canonical project destinations.
     Tradeoffs: Recovery now depends on title-token correctness for project routing and performs additional workspace-level recovery passes, which increases command count relative to the old one-destination flow.
 
@@ -298,9 +298,9 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Nil-focus activation records no new exact-origin window, so exit/close may restore an older focus-history candidate or use workspace routing fallback when history is exhausted. This is intentional best-effort behavior.
 
 - Decision 2026-03-01 close-workspace-retry: closeWorkspace re-queries and retries transient window-close misses
-    Decision: `ApAeroSpace.closeWorkspace` now re-queries `listWindowsWorkspace` after first-pass close failures, retries only IDs still present (single retry pass, no backoff), and includes specific window IDs in error messages. If re-query fails, returns the original first-pass error with IDs.
+    Decision: `PsAeroSpace.closeWorkspace` now re-queries `listWindowsWorkspace` after first-pass close failures, retries only IDs still present (single retry pass, no backoff), and includes specific window IDs in error messages. If re-query fails, returns the original first-pass error with IDs.
     Reason: Transient window-close failures (window closed by AeroSpace concurrently or timing race) caused the entire close to fail immediately, surfacing as `switcher.close_project.failed` for the user.
-    Tradeoffs: One additional `listWindowsWorkspace` call per close with failures. Adds ~15 lines to the `ap-aerospace-hotspot` file; contained within `closeWorkspace` with no new state or coupling.
+    Tradeoffs: One additional `listWindowsWorkspace` call per close with failures. Adds ~15 lines to the `ps-aerospace-hotspot` file; contained within `closeWorkspace` with no new state or coupling.
 
 - Decision 2026-03-02 token-fallback-skip-save: Token-miss fallback and capture skip-save for window positioning
     Decision: Added `getFallbackWindowFrame`/`setFallbackWindowFrames` to `WindowPositioning` protocol with default `.failure` implementations. Chrome positioning/capture and IDE positioning still use focused-or-only fallback when token matching exhausts retries, except when IDE activation confirms a repeated zero-window inventory (refined by `zero-window-confirmed-fast-fail`). Recovery fallback now requires a unique workspace anchor window and explicitly focuses that window before invoking fallback positioning. Layout partial-success paths keep token windows eligible for generic recovery because AX writes cannot be mapped back to individual AeroSpace window IDs.
@@ -312,10 +312,10 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Reason: The LIFO non-project focus stack only tracked non-project windows. Cross-project transitions (A→B→close B→should restore A) were lost because A's window was never on the non-project stack.
     Tradeoffs: The dictionary is in-memory only (not persisted); pre-entry state is lost on app restart. Stale entries for projects that are never closed accumulate until the app restarts.
 
-- Decision 2026-03-02 aerospace-decompose: ApAeroSpace mechanical decomposition into Parser, Transport, Compatibility
-    Decision: Extracted `AeroSpaceParser` (pure static parsing functions), `AeroSpaceCommandTransport` (execute+record with circuit breaker), and `AeroSpaceCompatibility` (static fallback detection) from `ApAeroSpace.swift`. ApAeroSpace retains `runAerospace()` orchestration (recovery/retry) and delegates to the extracted types. The compatibility extension preserves the `ApAeroSpace.shouldAttemptCompatibilityFallback` call site for test compatibility.
-    Reason: `ApAeroSpace.swift` was a ~1k LOC hotspot mixing transport, parsing, and compatibility concerns. Extraction reduces cognitive load and enables independent testing of each concern.
-    Tradeoffs: ApAeroSpace keeps `runAerospace()` because auto-recovery calls `start()` which is tightly coupled to lifecycle operations. Transport does not own the recovery loop.
+- Decision 2026-03-02 aerospace-decompose: PsAeroSpace mechanical decomposition into Parser, Transport, Compatibility
+    Decision: Extracted `AeroSpaceParser` (pure static parsing functions), `AeroSpaceCommandTransport` (execute+record with circuit breaker), and `AeroSpaceCompatibility` (static fallback detection) from `PsAeroSpace.swift`. PsAeroSpace retains `runAerospace()` orchestration (recovery/retry) and delegates to the extracted types. The compatibility extension preserves the `PsAeroSpace.shouldAttemptCompatibilityFallback` call site for test compatibility.
+    Reason: `PsAeroSpace.swift` was a ~1k LOC hotspot mixing transport, parsing, and compatibility concerns. Extraction reduces cognitive load and enables independent testing of each concern.
+    Tradeoffs: PsAeroSpace keeps `runAerospace()` because auto-recovery calls `start()` which is tightly coupled to lifecycle operations. Transport does not own the recovery loop.
 
 - Decision 2026-03-03 coordinator-extraction: Extract coordinators from SwitcherPanelController and AppDelegate
     Decision: Extracted `SwitcherOperationCoordinator`, `SwitcherWorkspaceRetryCoordinator`, `AppHealthCoordinator`, and `MenuWorkspaceStateCoordinator`. Coordinators own guard state and background dispatch; they report results through closure callbacks wired by their owners. Coordinator properties must be eagerly initialized (non-lazy); `lazy var` is disallowed because lazy init during `deinit` crashes (`weak_register_no_lock` on a deallocating object).
@@ -333,7 +333,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Tests that need specific AppDelegate behavior must use mocks/stubs rather than relying on the real setup path. This is already the case for all existing tests.
 
 - Decision 2026-03-03 injectable-timing: Make timing constants injectable for fast tests
-    Decision: Converted `ApAeroSpace.startupTimeoutSeconds` and `readinessCheckInterval` from static constants to instance properties with default values, injectable via both init methods.
+    Decision: Converted `PsAeroSpace.startupTimeoutSeconds` and `readinessCheckInterval` from static constants to instance properties with default values, injectable via both init methods.
     Reason: `testStartReturnsFailureWhenReadinessTimesOut` waited for the real 10s startup timeout on every test run. With injectable timing, the test uses 0.1s timeout and completes in ~0.1s instead of ~10s.
     Tradeoffs: Two extra optional parameters on init; callers outside tests use defaults and see no change.
 
@@ -348,7 +348,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: Smart pre-commit may miss cross-target regressions (CI catches them). `make setup` must be run once after clone. Test plan file must stay in sync with project.yml targets. Sequential testing is slower than parallel but deterministic.
 
 - Decision 2026-03-04 autorecovery-probe-terminate: Breaker-open recovery probes responsiveness before terminate
-    Decision: `ApAeroSpace.runAerospace()` now performs a direct `aerospace list-workspaces --focused` probe when the breaker is open and AeroSpace is still running. Recovery terminates AeroSpace only when it is running and unresponsive, and treats `terminateApplication(...) == false` as an explicit recovery failure (no silent fallback, no restart for that attempt). `RunningApplicationChecking` now requires explicit `terminateApplication` implementations (no default protocol fallback).
+    Decision: `PsAeroSpace.runAerospace()` now performs a direct `aerospace list-workspaces --focused` probe when the breaker is open and AeroSpace is still running. Recovery terminates AeroSpace only when it is running and unresponsive, and treats `terminateApplication(...) == false` as an explicit recovery failure (no silent fallback, no restart for that attempt). `RunningApplicationChecking` now requires explicit `terminateApplication` implementations (no default protocol fallback).
     Reason: A single timeout can trip the breaker while AeroSpace is still healthy; blindly treating `running == hung` risked killing healthy processes. Ignoring terminate failures also created silent-failure recovery paths.
     Tradeoffs: Recovery adds one extra probe command in running-process cases, and test doubles/conformers must implement termination behavior explicitly.
 
@@ -359,7 +359,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
 
 - Decision 2026-03-05 ax-error-factory-contract-tests: Extracted AXWindowPositioner error factories for contract testing
     Decision: Error construction in `AXWindowPositioner` extracted into `static` factory methods (`windowTokenNotFoundError`, `windowInventoryEmptyError`). AppKit test target covers the contract (correct reason, category, message content, classifier behavior) without requiring AX permissions or running apps.
-    Reason: Core retry/fallback logic branches on structured `ApCoreError.reason` values produced by AppKit; factory extraction makes the AppKit-to-Core contract directly testable.
+    Reason: Core retry/fallback logic branches on structured `PsCoreError.reason` values produced by AppKit; factory extraction makes the AppKit-to-Core contract directly testable.
     Tradeoffs: None significant — factory methods are pure functions with no external dependencies.
 
 - Decision 2026-03-05 resolver-timeout-validation-helper: Extracted ExecutableResolver timeout validation for testability
@@ -373,7 +373,7 @@ A rolling log of important, non-obvious decisions that materially affect future 
     Tradeoffs: One additional coordinator class; AppDelegate recovery methods are now thin delegates.
 
 - Decision 2026-03-08 treenode-workaround: Pre-recovery config reload + tree-node error retry (expanded 2026-03-19)
-    Decision: Three layers of defense against AeroSpace "already unbound" tree-node crashes: (1) `WindowRecoveryManager` calls `reloadConfig()` before workspace focus and retries on tree-node errors. (2) `closeProject()` calls `reloadConfig()` after `closeWorkspace` before focus restoration, flushing stale nodes left by workspace closure. (3) `ApAeroSpace.focusWindow()` detects tree-node errors and retries once after `reloadConfig()` as a safety net for all focus paths.
+    Decision: Three layers of defense against AeroSpace "already unbound" tree-node crashes: (1) `WindowRecoveryManager` calls `reloadConfig()` before workspace focus and retries on tree-node errors. (2) `closeProject()` calls `reloadConfig()` after `closeWorkspace` before focus restoration, flushing stale nodes left by workspace closure. (3) `PsAeroSpace.focusWindow()` detects tree-node errors and retries once after `reloadConfig()` as a safety net for all focus paths.
     Reason: After undocking or workspace closure, AeroSpace leaves floating window tree nodes in an unbound state. `focus --window-id` internally calls `makeFloatingWindowsSeenAsTiling` which crashes on these stale nodes ("MacWindow is already unbound"). The original fix only covered recovery paths; the crash also occurs during normal close-then-restore and any focus path.
     Tradeoffs: Up to two extra `reloadConfig()` CLI calls per close+restore cycle (~50ms each). `focusWindow()` retry adds one reload+retry on the rare tree-node error path only.
 

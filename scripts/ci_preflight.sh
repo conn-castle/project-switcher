@@ -61,7 +61,7 @@ else
 fi
 
 # 3. Info.plist uses build-setting variables (not hardcoded)
-plist="$REPO_ROOT/AgentPanelApp/Info.plist"
+plist="$REPO_ROOT/ProjectSwitcherApp/Info.plist"
 if [[ ! -f "$plist" ]]; then
   fail "Info.plist not found at $plist"
 else
@@ -78,11 +78,11 @@ else
 fi
 
 # 4. Entitlements file exists
-entitlements="$REPO_ROOT/release/AgentPanel.entitlements"
+entitlements="$REPO_ROOT/release/ProjectSwitcher.entitlements"
 if [[ -f "$entitlements" ]]; then
   echo "PASS: Entitlements file exists"
 else
-  fail "Entitlements file missing at release/AgentPanel.entitlements"
+  fail "Entitlements file missing at release/ProjectSwitcher.entitlements"
 fi
 
 # 5. CI scripts exist and are executable
@@ -242,7 +242,7 @@ if [[ -f "$signing_script" ]]; then
 fi
 
 # 13. Identity.swift buildVersion matches MARKETING_VERSION
-identity_swift="$REPO_ROOT/AgentPanelCore/Identity.swift"
+identity_swift="$REPO_ROOT/ProjectSwitcherCore/Identity.swift"
 if [[ -f "$identity_swift" ]]; then
   swift_version=$(grep 'static let buildVersion' "$identity_swift" | head -1 | sed 's/.*= *"\([^"]*\)".*/\1/')
   if [[ -z "$swift_version" ]]; then

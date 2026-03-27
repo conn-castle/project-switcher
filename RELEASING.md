@@ -1,4 +1,4 @@
-# Releasing AgentPanel
+# Releasing ProjectSwitcher
 
 This document covers how to create a new release. Releases are built, signed, notarized, and published automatically by CI when a version tag is pushed.
 
@@ -27,7 +27,7 @@ The release workflow requires **Xcode 26+** and fails early when an older Xcode 
 
 | Variable | Value |
 |----------|-------|
-| `CLI_INSTALL_PATH` | `/usr/local/bin/ap` |
+| `CLI_INSTALL_PATH` | `/usr/local/bin/pswitcher` |
 
 Note: The macOS deployment target is set in `project.yml` (single source of truth) and must not be overridden in CI. The tag prefix `v` is hardcoded in the workflow trigger.
 
@@ -66,7 +66,7 @@ Add a new section to `CHANGELOG.md` with the version and date:
 ### 3. Commit, tag, and push
 
 ```sh
-git add project.yml AgentPanel.xcodeproj CHANGELOG.md
+git add project.yml ProjectSwitcher.xcodeproj CHANGELOG.md
 git commit -m "Bump version to 0.2.0"
 git tag v0.2.0
 git push origin main v0.2.0
@@ -88,9 +88,9 @@ The release workflow (`.github/workflows/release.yml`) runs on `macos-26` and:
 8. Archives the app and codesigns with Developer ID identity (hardened runtime + entitlements).
 9. Codesigns the CLI binary with hardened runtime.
 10. Creates distribution artifacts:
-   - `AgentPanel-v<version>-macos-arm64.dmg` (app)
-   - `ap-v<version>-macos-arm64.pkg` (CLI installer, signed with Installer cert)
-   - `ap-v<version>-macos-arm64.tar.gz` (CLI binary)
+   - `ProjectSwitcher-v<version>-macos-arm64.dmg` (app)
+   - `pswitcher-v<version>-macos-arm64.pkg` (CLI installer, signed with Installer cert)
+   - `pswitcher-v<version>-macos-arm64.tar.gz` (CLI binary)
 11. Notarizes the DMG and PKG with Apple.
 12. Validates all artifacts (mounts DMG, verifies signatures, checks notarization).
 13. Generates `SHA256SUMS`.
@@ -102,14 +102,14 @@ After the workflow completes:
 
 ```sh
 # Download and verify the DMG
-spctl --assess --verbose=4 --type execute /path/to/AgentPanel.app
+spctl --assess --verbose=4 --type execute /path/to/ProjectSwitcher.app
 
 # Verify the PKG
-pkgutil --check-signature /path/to/ap-v0.2.0-macos-arm64.pkg
+pkgutil --check-signature /path/to/pswitcher-v0.2.0-macos-arm64.pkg
 
 # Verify the tarball CLI
-xattr -d com.apple.quarantine /path/to/ap
-./ap --version
+xattr -d com.apple.quarantine /path/to/pswitcher
+./pswitcher --version
 ```
 
 ## CI Scripts

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to AgentPanel are documented here.
+All notable changes to ProjectSwitcher are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -10,8 +10,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
-- **Display configuration change monitoring** -- AgentPanel now detects display configuration changes (dock/undock, monitor connect/disconnect) and triggers a health refresh, since these events correlate with AeroSpace tree-node bugs.
-- **Structured JSON logging** -- added `AgentPanelLogger` with structured JSON logging throughout circuit breaker recovery, config management, executable resolution, close-project, and focus-restore paths with contextual fields (window_id, workspace, project_id, screen dimensions).
+- **Display configuration change monitoring** -- ProjectSwitcher now detects display configuration changes (dock/undock, monitor connect/disconnect) and triggers a health refresh, since these events correlate with AeroSpace tree-node bugs.
+- **Structured JSON logging** -- added `ProjectSwitcherLogger` with structured JSON logging throughout circuit breaker recovery, config management, executable resolution, close-project, and focus-restore paths with contextual fields (window_id, workspace, project_id, screen dimensions).
 
 ### Changed
 
@@ -36,7 +36,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 - **RecoveryOperationCoordinator extraction** -- moved recover-current-window, recover-workspace, and recover-all-windows operations from AppDelegate into a dedicated testable coordinator, matching the SwitcherOperationCoordinator pattern.
 - **Async close/exit/recovery operations** -- converted close, exit, and recovery operations from Thread.sleep to async/await with Task.sleep for cooperative, non-blocking retry delays.
-- **Structured window positioning errors** -- replaced message-text matching with structured `ApCoreError.reason` values (`.windowTokenNotFound`, `.windowInventoryEmpty`) across all window positioning retry/fallback paths.
+- **Structured window positioning errors** -- replaced message-text matching with structured `PsCoreError.reason` values (`.windowTokenNotFound`, `.windowInventoryEmpty`) across all window positioning retry/fallback paths.
 - **Non-project focus restoration bounded** -- `restoreNonProjectFocusFromStack` now limited to 5 candidates with a 30-second budget to prevent runaway loops.
 - **retryTransientWindowOp extraction** -- extracted shared retry helper, eliminating 4x duplication across window operation paths.
 - **Doctor decomposition** -- decomposed `Doctor.run()` into per-section methods for maintainability.
@@ -57,7 +57,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
-- **AeroSpace auto-recovery** -- when the AeroSpace process becomes unresponsive, AgentPanel now detects the condition and attempts a graceful restart with force-terminate fallback (max 2 attempts), preventing extended outages from a hung AeroSpace process.
+- **AeroSpace auto-recovery** -- when the AeroSpace process becomes unresponsive, ProjectSwitcher now detects the condition and attempts a graceful restart with force-terminate fallback (max 2 attempts), preventing extended outages from a hung AeroSpace process.
 - **Dedicated Doctor circuit breaker** -- Doctor diagnostics now use an independent circuit breaker so diagnostic checks are never blocked by the shared AeroSpace breaker state.
 
 ### Changed
@@ -67,7 +67,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 - **Capture skip-save on partial frames** -- when Chrome frame capture fails, the save is skipped entirely instead of writing a partial (IDE-only) layout, preserving the prior complete layout for the next restore.
 - **Off-screen recovery threshold** -- window off-screen detection now uses a percentage-based threshold (10%) instead of absolute pixels, improving reliability across display resolutions.
 - **ProjectManager and SwitcherPanelController split** -- decomposed the monolithic controller into separate focused modules for maintainability.
-- **AeroSpace facade decomposition** -- split ApAeroSpace into Parser, CommandTransport, and Compatibility modules (1054 to 886 LOC in the main file).
+- **AeroSpace facade decomposition** -- split PsAeroSpace into Parser, CommandTransport, and Compatibility modules (1054 to 886 LOC in the main file).
 - **Test infrastructure overhaul** -- always-coverage collection, smart pre-commit hook that maps staged files to affected test targets, decomposed monolithic test files into 33 focused suites, and stubbed slow infrastructure dependencies for faster test runs.
 
 ### Fixed
@@ -95,13 +95,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Changed
 
-- **Recover all projects flow** -- renamed the menu action to `Recover All Projects...` and changed behavior to recover every window across all workspaces, routing project-tagged windows (`AP:<projectId>`) for configured projects into their `ap-<projectId>` workspace before workspace recovery runs.
+- **Recover all projects flow** -- renamed the menu action to `Recover All Projects...` and changed behavior to recover every window across all workspaces, routing project-tagged windows (`PS:<projectId>`) for configured projects into their `ps-<projectId>` workspace before workspace recovery runs.
 
 ## [0.1.11] - 2026-02-24
 
 ### Added
 
-- **Persisted non-project focus history** -- AgentPanel now persists non-project focus history in `state.json` and reuses it across app/CLI sessions, improving return/exit restoration determinism after restarts.
+- **Persisted non-project focus history** -- ProjectSwitcher now persists non-project focus history in `state.json` and reuses it across app/CLI sessions, improving return/exit restoration determinism after restarts.
 - **Launch-at-login toggler coverage** -- app wiring now includes explicit launch-at-login toggler behavior and regression coverage for login-item state transitions.
 
 ### Changed
@@ -126,11 +126,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Changed
 
-- **Accessibility startup prompt UX** -- when Accessibility permission is missing, AgentPanel now requests it automatically once per installed app build at startup. Doctor still provides the manual retry button.
+- **Accessibility startup prompt UX** -- when Accessibility permission is missing, ProjectSwitcher now requests it automatically once per installed app build at startup. Doctor still provides the manual retry button.
 
 ### Fixed
 
-- **Doctor release-build text visibility hardening** -- moved Doctor attributed rendering into `AgentPanelAppKit`, switched to explicit contrast-safe palettes (light/dark), and aligned report background/text color handling so report text remains readable across release toolchains and appearance changes.
+- **Doctor release-build text visibility hardening** -- moved Doctor attributed rendering into `ProjectSwitcherAppKit`, switched to explicit contrast-safe palettes (light/dark), and aligned report background/text color handling so report text remains readable across release toolchains and appearance changes.
 - **CI toolchain modernization** -- CI and release workflows now run on `macos-26`, use latest action majors (`actions/checkout@v6`, `actions/cache@v5`), and enforce Xcode major version (`26+`) to keep release builds aligned with current toolchains.
 
 ## [0.1.8] - 2026-02-21
@@ -189,7 +189,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 ### Fixed
 
 - **Red menu bar icon after every update** -- Accessibility permission check used FAIL severity, causing the menu bar icon to turn red after every app update (macOS revokes Accessibility when the binary signature changes). Changed to WARN severity — the icon shows orange instead of red, correctly reflecting that the app works without Accessibility (only window positioning is degraded).
-- **CLI reports version 0.0.0-dev** -- The `ap` CLI binary had no Info.plist, so `Bundle.main.infoDictionary` returned nil and the version fell back to `"0.0.0-dev"`. Added a build-time `buildVersion` constant in `Identity.swift` with a CI preflight check to keep it in sync with `MARKETING_VERSION` in `project.yml`.
+- **CLI reports version 0.0.0-dev** -- The `pswitcher` CLI binary had no Info.plist, so `Bundle.main.infoDictionary` returned nil and the version fell back to `"0.0.0-dev"`. Added a build-time `buildVersion` constant in `Identity.swift` with a CI preflight check to keep it in sync with `MARKETING_VERSION` in `project.yml`.
 - **Doctor logs don't show what failed** -- Doctor log entries only included pass/warn/fail counts, making remote debugging impossible. Added `fail_findings` and `warn_findings` context keys with actual finding titles. Added full rendered report text, per-section timing breakdown, and total duration to every Doctor log entry. Startup log now includes binary path, bundle path, and macOS version. Doctor report header now shows duration and section timings.
 
 ## [0.1.3] - 2026-02-18
@@ -203,7 +203,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Fixed
 
-- **App freeze on startup** -- Every `ApSystemCommandRunner` instance spawned a login shell process during init to build an augmented PATH. With 9 instances created on the main thread during startup (`ProjectManager` launchers, `ApAeroSpace`, `WindowCycler`, etc.), this blocked the main thread for 5-10+ seconds, freezing the entire system. The augmented environment is now computed once (lazily, on first `run()` call) and cached globally via a thread-safe `static let`. Init is instant.
+- **App freeze on startup** -- Every `PsSystemCommandRunner` instance spawned a login shell process during init to build an augmented PATH. With 9 instances created on the main thread during startup (`ProjectManager` launchers, `PsAeroSpace`, `WindowCycler`, etc.), this blocked the main thread for 5-10+ seconds, freezing the entire system. The augmented environment is now computed once (lazily, on first `run()` call) and cached globally via a thread-safe `static let`. Init is instant.
 - **Menu bar freeze on click** -- `menuNeedsUpdate` called `captureCurrentFocus()` and `workspaceState()` synchronously on the main thread, each invoking AeroSpace CLI with a 5-second timeout. Now uses cached workspace state refreshed in the background after Doctor runs, switcher sessions end, and each menu open.
 - **Switcher/Doctor/menu actions block main thread** -- `toggleSwitcher`, `openSwitcher`, `runDoctor`, and `addWindowToProject` all called AeroSpace CLI on the main thread. Moved all CLI calls to background dispatch queues with main-thread callbacks for UI updates.
 - **Switcher panel blocks main thread** -- `refreshWorkspaceState()`, `closeProject()`, `captureCurrentFocus()`, `exitToNonProjectWindow()`, and workspace retry timer all called AeroSpace CLI synchronously on the main thread within the switcher panel. Dispatched all CLI calls to background queues; UI updates bounce back to main thread.
@@ -214,7 +214,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Fixed
 
-- **Doctor freeze in release build** -- `ExecutableResolver.runLoginShellCommand()` used synchronous `readDataToEndOfFile()` which blocks forever if the user's shell config (`.zshrc`/`.zprofile`) spawns background daemons that inherit the pipe's write-end file descriptor. Replaced with async `readabilityHandler` + EOF semaphore with bounded timeout, matching the safe pattern already used by `ApSystemCommandRunner`.
+- **Doctor freeze in release build** -- `ExecutableResolver.runLoginShellCommand()` used synchronous `readDataToEndOfFile()` which blocks forever if the user's shell config (`.zshrc`/`.zprofile`) spawns background daemons that inherit the pipe's write-end file descriptor. Replaced with async `readabilityHandler` + EOF semaphore with bounded timeout, matching the safe pattern already used by `PsSystemCommandRunner`.
 
 ## [0.1.0] - 2026-02-17
 
@@ -223,7 +223,7 @@ Initial public release.
 ### Added
 
 - **Project switching** -- global hotkey (`Cmd+Shift+Space`) opens a searchable switcher panel sorted by recency. Select a project to activate its workspace with VS Code and Chrome.
-- **Workspace orchestration** -- each project gets a dedicated AeroSpace workspace (`ap-<projectId>`). Windows are created, moved, and focused automatically.
+- **Workspace orchestration** -- each project gets a dedicated AeroSpace workspace (`ps-<projectId>`). Windows are created, moved, and focused automatically.
 - **Chrome tab persistence** -- tabs are captured on project close and restored on activate. Per-project pinned tabs and default tabs configurable.
 - **Window layout engine** -- configurable side-by-side positioning with screen-size-aware rules. Small screens maximize; wide screens tile. Requires Accessibility permission.
 - **Window recovery** -- recover project windows to computed layout or center all windows across workspaces.
@@ -231,12 +231,12 @@ Initial public release.
 - **SSH remote projects** -- VS Code Remote-SSH integration with remote `.vscode/settings.json` block management and parallel SSH Doctor checks.
 - **Agent Layer integration** -- optional `al sync` + `al vscode` launch path for projects using the Agent Layer CLI.
 - **VS Code color differentiation** -- per-project colors via the Peacock extension. Colors persist across settings.json re-injections.
-- **Doctor diagnostics** -- comprehensive setup validation (Homebrew, AeroSpace, VS Code, Chrome, config, paths, SSH, permissions, hotkeys) with actionable fix guidance. Available in app UI and CLI (`ap doctor`).
+- **Doctor diagnostics** -- comprehensive setup validation (Homebrew, AeroSpace, VS Code, Chrome, config, paths, SSH, permissions, hotkeys) with actionable fix guidance. Available in app UI and CLI (`pswitcher doctor`).
 - **AeroSpace auto-management** -- versioned config template with auto-update on startup. User keybindings and custom config preserved between updates.
 - **AeroSpace resilience** -- circuit breaker (30s cooldown) prevents timeout cascades. Auto-recovery restarts crashed AeroSpace processes (max 2 attempts).
-- **Focus stack** -- LIFO stack tracks non-project windows. `Shift+Enter` or `ap return` restores the last active non-project context.
+- **Focus stack** -- LIFO stack tracks non-project windows. `Shift+Enter` or `pswitcher return` restores the last active non-project context.
 - **Auto-start at login** -- configurable via `[app].autoStartAtLogin` or menu bar toggle. Uses `SMAppService`.
 - **Auto-doctor on critical errors** -- background Doctor run when critical activation errors occur.
-- **CLI (`ap`)** -- `doctor`, `show-config`, `list-projects`, `select-project`, `close-project`, `return` commands with ANSI color output and TTY detection.
+- **CLI (`pswitcher`)** -- `doctor`, `show-config`, `list-projects`, `select-project`, `close-project`, `return` commands with ANSI color output and TTY detection.
 - **Menu bar app** -- background-only (no Dock icon) with health indicator, config access, window recovery, and Doctor.
 - **Signed and notarized releases** -- DMG (app), PKG (CLI installer), and tarball published via GitHub Releases. CI workflow handles signing, notarization, and stapling.

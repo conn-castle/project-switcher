@@ -30,14 +30,14 @@ Notes: <optional constraints or tips>
 Run the doctor verification suite (checks config, dependencies, permissions, and app state):
 
 ```bash
-ap doctor
+pswitcher doctor
 ```
 
 Run from repo root (or anywhere if installed).
 
 ## Generate
 
-Regenerate `AgentPanel.xcodeproj` from `project.yml` (XcodeGen):
+Regenerate `ProjectSwitcher.xcodeproj` from `project.yml` (XcodeGen):
 
 ```bash
 make regen
@@ -81,7 +81,7 @@ make build-dev
 ```
 
 Run from repo root. Prerequisites: `xcbeautify` installed (`brew install xcbeautify`).
-Notes: Produces `build/DerivedData/Build/Products/Debug/AgentPanel Dev.app` with a distinct bundle identifier so dev and release can be installed side-by-side.
+Notes: Produces `build/DerivedData/Build/Products/Debug/ProjectSwitcher Dev.app` with a distinct bundle identifier so dev and release can be installed side-by-side.
 
 Reference (underlying script): `scripts/build_dev.sh`
 
@@ -93,20 +93,20 @@ Clean build artifacts (DerivedData + build output). Logs are outside the repo an
 make clean
 ```
 
-Run from repo root. Notes: The script prints the exact `rm -rf` command to delete logs under `~/.local/state/agent-panel/logs`.
+Run from repo root. Notes: The script prints the exact `rm -rf` command to delete logs under `~/.local/state/project-switcher/logs`.
 
 Reference (underlying script): `scripts/clean.sh`
 
 ## Test
 
-Run all unit tests (Debug) with coverage collection and parallel execution:
+Run all unit tests (Debug) with coverage collection:
 
 ```bash
 make test
 ```
 
 Run from repo root. Prerequisites: `xcbeautify` installed (`brew install xcbeautify`).
-Notes: Always collects coverage data (zero overhead). Does not enforce the coverage gate — use `make coverage` for the full quality gate.
+Notes: Always collects coverage data (zero overhead). Test execution is serialized (`-parallel-testing-enabled NO`). Does not enforce the coverage gate — use `make coverage` for the full quality gate.
 
 Reference (underlying script): `scripts/test.sh`
 
@@ -115,15 +115,15 @@ Reference (underlying script): `scripts/test.sh`
 Run a single test bundle:
 
 ```bash
-make test-app    # AgentPanelAppTests only
-make test-core   # AgentPanelCoreTests only
-make test-cli    # AgentPanelCLITests only
+make test-app    # ProjectSwitcherAppTests only
+make test-core   # ProjectSwitcherCoreTests only
+make test-cli    # ProjectSwitcherCLITests only
 ```
 
 Run a single test method:
 
 ```bash
-make test-one TARGET=AgentPanelAppTests TEST=SwitcherWorkspaceRetryCoordinatorTests/testScheduleRetryTriggersOnRetrySucceededWhenWorkspaceStateSucceeds
+make test-one TARGET=ProjectSwitcherAppTests TEST=SwitcherWorkspaceRetryCoordinatorTests/testScheduleRetryTriggersOnRetrySucceededWhenWorkspaceStateSucceeds
 ```
 
 Run from repo root. Notes: Uses `-only-testing:` xcodebuild flag. `--test` requires `--target`. `make test-one` requires both `TARGET` and `TEST`. All selective runs collect coverage.
@@ -146,7 +146,7 @@ Reference (underlying script): `scripts/test.sh --gate`
 Re-check the coverage gate from an existing test result bundle:
 
 ```bash
-scripts/coverage_gate.sh build/TestResults/Test-AgentPanel.xcresult
+scripts/coverage_gate.sh build/TestResults/Test-ProjectSwitcher.xcresult
 ```
 
 Run from repo root. Notes: the `.xcresult` bundle is produced by `make coverage`.
@@ -202,6 +202,6 @@ Install repo-managed git hooks (pre-commit runs targeted tests based on staged f
 make hooks
 ```
 
-Run from repo root. Notes: sets local git config `core.hooksPath` to `.githooks`. The pre-commit hook maps staged file paths to test targets (e.g., `AgentPanelApp/*` → AgentPanelAppTests) and only runs the affected targets. Infrastructure file changes (`project.yml`, `Makefile`, `scripts/*`) trigger all tests. Non-source changes skip tests entirely. No coverage gate — CI enforces that.
+Run from repo root. Notes: sets local git config `core.hooksPath` to `.githooks`. The pre-commit hook maps staged file paths to test targets (e.g., `ProjectSwitcherApp/*` → ProjectSwitcherAppTests) and only runs the affected targets. Infrastructure file changes (`project.yml`, `Makefile`, `scripts/*`) trigger all tests. Non-source changes skip tests entirely. No coverage gate — CI enforces that.
 
 Reference (underlying script): `scripts/install_git_hooks.sh`

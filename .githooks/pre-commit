@@ -12,21 +12,21 @@ run_all=false
 
 while IFS= read -r file; do
   case "$file" in
-    AgentPanelApp/*|AgentPanelAppTests/*)
-      targets+=("AgentPanelAppTests")
+    ProjectSwitcherApp/*|ProjectSwitcherAppTests/*)
+      targets+=("ProjectSwitcherAppTests")
       ;;
-    AgentPanelAppKit/*)
-      targets+=("AgentPanelCoreTests")
-      targets+=("AgentPanelAppTests")
-      targets+=("AgentPanelCLITests")
+    ProjectSwitcherAppKit/*)
+      targets+=("ProjectSwitcherCoreTests")
+      targets+=("ProjectSwitcherAppTests")
+      targets+=("ProjectSwitcherCLITests")
       ;;
-    AgentPanelCore/*|AgentPanelCoreTests/*)
-      targets+=("AgentPanelCoreTests")
-      targets+=("AgentPanelAppTests")
-      targets+=("AgentPanelCLITests")
+    ProjectSwitcherCore/*|ProjectSwitcherCoreTests/*)
+      targets+=("ProjectSwitcherCoreTests")
+      targets+=("ProjectSwitcherAppTests")
+      targets+=("ProjectSwitcherCLITests")
       ;;
-    AgentPanelCLI/*|AgentPanelCLICore/*|AgentPanelCLITests/*)
-      targets+=("AgentPanelCLITests")
+    ProjectSwitcherCLI/*|ProjectSwitcherCLICore/*|ProjectSwitcherCLITests/*)
+      targets+=("ProjectSwitcherCLITests")
       ;;
     project.yml|Makefile|scripts/*|*.xcodeproj/*|*.xcscheme|TestPlans/*)
       run_all=true

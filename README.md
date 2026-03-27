@@ -1,19 +1,19 @@
 <p align="center">
-  <img src="docs/logo-readme.svg" width="128" height="128" alt="AgentPanel">
+  <img src="docs/logo-readme.svg" width="128" height="128" alt="ProjectSwitcher">
 </p>
 
-<h1 align="center">AgentPanel</h1>
+<h1 align="center">ProjectSwitcher</h1>
 
 <p align="center">
 A macOS menu bar app for engineers who work across many repositories.<br>
 One hotkey to switch projects, with your IDE, browser, tabs, and window layout restored automatically.
 </p>
 
-AgentPanel manages [AeroSpace](https://github.com/nikitabobko/AeroSpace) workspaces behind the scenes so each project gets its own isolated desktop context. Switch in, do your work, switch out. No manual window shuffling.
+ProjectSwitcher manages [AeroSpace](https://github.com/nikitabobko/AeroSpace) workspaces behind the scenes so each project gets its own isolated desktop context. Switch in, do your work, switch out. No manual window shuffling.
 
-Product direction: AgentPanel is intended to be the single place you run your day-to-day workspace workflow, with AeroSpace acting as the underlying engine.
+Product direction: ProjectSwitcher is intended to be the single place you run your day-to-day workspace workflow, with AeroSpace acting as the underlying engine.
 
-For users who want an uncluttered menu bar, it can be desirable to remove or hide the AeroSpace menu bar item and keep AgentPanel as the visible control point. This is optional and currently outside AgentPanel-managed behavior.
+For users who want an uncluttered menu bar, it can be desirable to remove or hide the AeroSpace menu bar item and keep ProjectSwitcher as the visible control point. This is optional and currently outside ProjectSwitcher-managed behavior.
 
 ## Features
 
@@ -24,7 +24,7 @@ For users who want an uncluttered menu bar, it can be desirable to remove or hid
 - **Project-scoped window cycling overlay** -- hold `Option` and tap `Tab` to preview project windows, then release `Option` to commit the highlighted window.
 - **SSH remote projects** -- works with VS Code Remote-SSH for remote development workflows.
 - **Built-in diagnostics** -- `Doctor` checks your setup end-to-end, opens immediately with loading feedback, and renders a color-coded report with actionable fixes.
-- **CLI included** -- `ap doctor`, `ap select-project`, `ap close-project`, and more for scripting and automation.
+- **CLI included** -- `pswitcher doctor`, `pswitcher select-project`, `pswitcher close-project`, and more for scripting and automation.
 - **Self-healing** -- circuit breaker and bounded auto-recovery when the breaker is open. Off-main calls can recover immediately after a responsive probe (retry without restart); main-thread calls fail fast while recovery runs asynchronously. Unresponsive probes attempt termination before restart. Off-screen windows are automatically recovered when focused.
 - **Color coding** -- each project gets a distinct color in VS Code via the Peacock extension.
 
@@ -43,33 +43,33 @@ Optional:
 
 ### App
 
-1. Download `AgentPanel-v<version>-macos-arm64.dmg` from [GitHub Releases](../../releases).
-2. Open the DMG and drag `AgentPanel.app` to `/Applications`.
-3. Launch AgentPanel. On first launch it will offer to install and configure AeroSpace.
+1. Download `ProjectSwitcher-v<version>-macos-arm64.dmg` from [GitHub Releases](../../releases).
+2. Open the DMG and drag `ProjectSwitcher.app` to `/Applications`.
+3. Launch ProjectSwitcher. On first launch it will offer to install and configure AeroSpace.
 
 ### CLI (optional)
 
-The `ap` command-line tool gives you access to project switching and diagnostics from the terminal.
+The `pswitcher` command-line tool gives you access to project switching and diagnostics from the terminal.
 
 **Option A: PKG installer**
 ```sh
-# Download and run ap-v<version>-macos-arm64.pkg
-ap --version
+# Download and run pswitcher-v<version>-macos-arm64.pkg
+pswitcher --version
 ```
 
 **Option B: Manual install**
 ```sh
-tar -xzf ap-v<version>-macos-arm64.tar.gz
-sudo mv ap /usr/local/bin/ap
+tar -xzf pswitcher-v<version>-macos-arm64.tar.gz
+sudo mv pswitcher /usr/local/bin/pswitcher
 # If Gatekeeper blocks execution:
-xattr -d com.apple.quarantine /usr/local/bin/ap
+xattr -d com.apple.quarantine /usr/local/bin/pswitcher
 ```
 
 ## Quick Start
 
-1. Launch AgentPanel from `/Applications`. Complete the onboarding prompt (installs AeroSpace if needed).
+1. Launch ProjectSwitcher from `/Applications`. Complete the onboarding prompt (installs AeroSpace if needed).
 
-2. Create your config file at `~/.config/agent-panel/config.toml`:
+2. Create your config file at `~/.config/project-switcher/config.toml`:
 
 ```toml
 [[project]]
@@ -85,11 +85,11 @@ color = "green"
 
 3. Press `Cmd+Shift+Space` to open the switcher. Select a project and press `Enter`.
 
-AgentPanel creates a workspace, opens VS Code and Chrome, and positions your windows. Press `Cmd+Shift+Space` again to switch to a different project.
+ProjectSwitcher creates a workspace, opens VS Code and Chrome, and positions your windows. Press `Cmd+Shift+Space` again to switch to a different project.
 
 ## Configuration
 
-Config file: `~/.config/agent-panel/config.toml`
+Config file: `~/.config/project-switcher/config.toml`
 
 Use **View Config File...** from the menu bar to open it (creates a starter file if missing).
 
@@ -113,8 +113,8 @@ justification = "right"      # which screen edge to align to
 maxGap = 10                  # percent; gap between windows
 
 [[project]]
-name = "AgentPanel"
-path = "/Users/you/src/agent-panel"
+name = "ProjectSwitcher"
+path = "/Users/you/src/project-switcher"
 color = "indigo"
 useAgentLayer = true
 chromePinnedTabs = ["https://linear.app"]
@@ -131,7 +131,7 @@ color = "#009688"
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `autoStartAtLogin` | bool | `false` | Launch AgentPanel when you log in |
+| `autoStartAtLogin` | bool | `false` | Launch ProjectSwitcher when you log in |
 
 ### `[agentLayer]` section
 
@@ -150,7 +150,7 @@ color = "#009688"
 ### `[layout]` section
 
 Requires Accessibility permission (grant via System Settings > Privacy & Security > Accessibility).
-If permission is missing, AgentPanel requests it automatically once per installed app build on startup. You can also request it manually from Doctor.
+If permission is missing, ProjectSwitcher requests it automatically once per installed app build on startup. You can also request it manually from Doctor.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -179,7 +179,7 @@ If permission is missing, AgentPanel requests it automatically once per installe
 
 ### Config rules
 
-- Unknown keys are hard failures. AgentPanel does not silently ignore typos.
+- Unknown keys are hard failures. ProjectSwitcher does not silently ignore typos.
 - Local project `path` must be absolute (starting with `/`).
 - SSH projects: `remote` must match `ssh-remote+<authority>` format, `path` is the remote absolute path, and `useAgentLayer` must be `false`.
 - All URLs must start with `http://` or `https://`.
@@ -213,7 +213,7 @@ Window cycling behavior:
 
 ### Menu bar
 
-AgentPanel lives in the menu bar with a health indicator icon:
+ProjectSwitcher lives in the menu bar with a health indicator icon:
 
 - **Green** = all Doctor checks pass
 - **Orange** = warnings present
@@ -235,25 +235,25 @@ Menu actions:
 ## CLI
 
 ```
-ap <command> [options]
+pswitcher <command> [options]
 ```
 
 | Command | Description |
 |---------|-------------|
-| `ap doctor` | Run all diagnostic checks (exit 1 on failure) |
-| `ap show-config` | Display parsed configuration |
-| `ap list-projects [query]` | List projects, optionally filtered |
-| `ap select-project <id>` | Activate a project (30s timeout) |
-| `ap close-project <id>` | Close a project and return to non-project space |
-| `ap return` | Return to most recent non-project window |
-| `ap --version` | Print version |
+| `pswitcher doctor` | Run all diagnostic checks (exit 1 on failure) |
+| `pswitcher show-config` | Display parsed configuration |
+| `pswitcher list-projects [query]` | List projects, optionally filtered |
+| `pswitcher select-project <id>` | Activate a project (30s timeout) |
+| `pswitcher close-project <id>` | Close a project and return to non-project space |
+| `pswitcher return` | Return to most recent non-project window |
+| `pswitcher --version` | Print version |
 
 ## Doctor
 
-Doctor validates your entire setup and tells you exactly what to fix. Run it from the menu bar (**Run Doctor...**) or the CLI (`ap doctor`).
+Doctor validates your entire setup and tells you exactly what to fix. Run it from the menu bar (**Run Doctor...**) or the CLI (`pswitcher doctor`).
 
 In the app, Doctor opens immediately with a loading spinner and then renders a color-coded report (PASS/WARN/FAIL) with direct action buttons when relevant.
-If Accessibility permission is missing, AgentPanel may also show a startup prompt once per installed build; Doctor remains the manual retry path.
+If Accessibility permission is missing, ProjectSwitcher may also show a startup prompt once per installed build; Doctor remains the manual retry path.
 
 Checks include:
 
@@ -272,7 +272,7 @@ Each finding includes a severity (PASS / WARN / FAIL) and an actionable fix. The
 ## Troubleshooting
 
 **Switcher hotkey does nothing**
-- Run `ap doctor` and check the hotkey registration findings.
+- Run `pswitcher doctor` and check the hotkey registration findings.
 - Check System Settings for conflicting global shortcuts.
 
 **Window positioning doesn't work**
@@ -286,22 +286,22 @@ Each finding includes a severity (PASS / WARN / FAIL) and an actionable fix. The
 
 **AeroSpace errors or slow recovery**
 - Open **Run Doctor...** to inspect AeroSpace status.
-- AgentPanel attempts AeroSpace recovery after breaker trips (30s cooldown, max 2 recovery attempts per breaker trip). Off-main calls can immediately retry after a responsive probe; main-thread calls fail fast while recovery runs asynchronously. If a probe confirms AeroSpace is running but unresponsive, AgentPanel attempts termination before restart; failed recovery is surfaced by Doctor and logs.
+- ProjectSwitcher attempts AeroSpace recovery after breaker trips (30s cooldown, max 2 recovery attempts per breaker trip). Off-main calls can immediately retry after a responsive probe; main-thread calls fail fast while recovery runs asynchronously. If a probe confirms AeroSpace is running but unresponsive, ProjectSwitcher attempts termination before restart; failed recovery is surfaced by Doctor and logs.
 
 **Agent Layer project fails**
 - Ensure `al` and `code` are on your PATH.
 - Ensure the project has a local `.agent-layer` directory.
 
 **Logs**
-- App logs: `~/.local/state/agent-panel/logs/agent-panel.log`
+- App logs: `~/.local/state/project-switcher/logs/project-switcher.log`
 - Rotated: `.1` through `.5` at 10 MiB
 - Format: JSON Lines with UTC timestamps
 
 **Data locations**
-- Config: `~/.config/agent-panel/config.toml`
-- State: `~/.local/state/agent-panel/`
-- Chrome tabs: `~/.local/state/agent-panel/chrome-tabs/<projectId>.json`
-- Window layouts: `~/.local/state/agent-panel/window-layouts.json`
+- Config: `~/.config/project-switcher/config.toml`
+- State: `~/.local/state/project-switcher/`
+- Chrome tabs: `~/.local/state/project-switcher/chrome-tabs/<projectId>.json`
+- Window layouts: `~/.local/state/project-switcher/window-layouts.json`
 - AeroSpace config: `~/.aerospace.toml`
 
 ## Known Limitations
@@ -326,10 +326,10 @@ make coverage             # Run tests with coverage gate (90% minimum)
 
 ### Dev vs release app identity
 
-- `make build` produces `AgentPanel.app` (`com.agentpanel.AgentPanel`) and matches release naming.
-- `make build-dev` produces `AgentPanel Dev.app` (`com.agentpanel.AgentPanel.dev`) for local development.
+- `make build` produces `ProjectSwitcher.app` (`com.projectswitcher.ProjectSwitcher`) and matches release naming.
+- `make build-dev` produces `ProjectSwitcher Dev.app` (`com.projectswitcher.ProjectSwitcher.dev`) for local development.
 - You can install and run both at the same time; macOS treats them as distinct apps for Accessibility and Automation permissions.
-- Both app variants intentionally share the same config/state locations (`~/.config/agent-panel/`, `~/.local/state/agent-panel/`).
+- Both app variants intentionally share the same config/state locations (`~/.config/project-switcher/`, `~/.local/state/project-switcher/`).
 
 ## License
 
