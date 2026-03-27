@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-27
+
+### Changed
+
+- **Project rename** -- renamed the product and release identity from AgentPanel to ProjectSwitcher.
+
+### Deprecated
+
+- **Project sunset** -- added a prominent README notice clarifying that the repository remains available but is no longer actively maintained.
+
 ## [0.1.15] - 2026-03-19
 
 ### Added

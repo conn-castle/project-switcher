@@ -23,8 +23,8 @@ targetTemplates:
     settings:
       base:
         INFOPLIST_FILE: ProjectSwitcherApp/Info.plist
-        MARKETING_VERSION: "0.1.15"
-        CURRENT_PROJECT_VERSION: 13
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: 14
         CODE_SIGN_ENTITLEMENTS: release/ProjectSwitcher.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
