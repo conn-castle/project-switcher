@@ -95,7 +95,6 @@ jobs:
           DEVELOPER_ID_APP_IDENTITY: ${{ secrets.DEVELOPER_ID_APP_IDENTITY }}
           DEVELOPER_ID_INSTALLER_IDENTITY: ${{ secrets.DEVELOPER_ID_INSTALLER_IDENTITY }}
           VERSION: ${{ steps.version.outputs.VERSION }}
-          CLI_INSTALL_PATH: ${{ vars.CLI_INSTALL_PATH }}
         run: scripts/ci_package.sh
 
       - name: Notarize DMG

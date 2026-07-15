@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-15
+
+### Fixed
+
+- **Canonical CLI package path** -- moved the signed PKG destination into repository-controlled release configuration and added payload validation so the installer places the binary at `/usr/local/bin/pswitcher`. This supersedes the `v0.2.1` PKG, which used a stale GitHub environment value.
+
 ## [0.2.1] - 2026-07-15
 
 ### Added

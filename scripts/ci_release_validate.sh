@@ -9,6 +9,8 @@ set -euo pipefail
 
 staging_path="$RUNNER_TEMP/staging"
 artifacts_path="$RUNNER_TEMP/artifacts"
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cli_install_path=$(<"$repo_root/release/cli-install-path")
 
 dmg="$artifacts_path/ProjectSwitcher-v${VERSION}-macos-arm64.dmg"
 pkg="$artifacts_path/pswitcher-v${VERSION}-macos-arm64.pkg"
@@ -50,6 +52,14 @@ echo ""
 echo "=== Validating PKG ==="
 pkgutil --check-signature "$pkg"
 spctl --assess --verbose=4 --type install "$pkg"
+expected_pkg_path="./${cli_install_path#/}"
+if ! pkgutil --payload-files "$pkg" | grep -Fxq "$expected_pkg_path"; then
+  echo "error: CLI package payload does not contain $expected_pkg_path" >&2
+  echo "PKG payload:" >&2
+  pkgutil --payload-files "$pkg" >&2
+  exit 1
+fi
+echo "PKG payload installs $expected_pkg_path"
 
 echo ""
 echo "ci_release_validate: OK — all artifacts verified"

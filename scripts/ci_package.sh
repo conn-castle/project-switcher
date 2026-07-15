@@ -7,11 +7,12 @@ set -euo pipefail
 #   DEVELOPER_ID_APP_IDENTITY       — for DMG codesigning
 #   DEVELOPER_ID_INSTALLER_IDENTITY — for PKG signing
 #   VERSION                         — e.g. "0.1.0"
-#   CLI_INSTALL_PATH                — e.g. "/usr/local/bin/pswitcher"
 #   RUNNER_TEMP
 
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 staging_path="$RUNNER_TEMP/staging"
 artifacts_path="$RUNNER_TEMP/artifacts"
+cli_install_path_file="$repo_root/release/cli-install-path"
 
 mkdir -p "$artifacts_path"
 
@@ -24,12 +25,17 @@ if [[ ! -x "$staging_path/pswitcher" ]]; then
   echo "error: staged CLI binary not found at $staging_path/pswitcher" >&2
   exit 1
 fi
-if [[ -z "${CLI_INSTALL_PATH:-}" ]]; then
-  echo "error: CLI_INSTALL_PATH is not set or empty" >&2
+if [[ ! -f "$cli_install_path_file" ]]; then
+  echo "error: CLI install path file not found at $cli_install_path_file" >&2
   exit 1
 fi
-if [[ "$CLI_INSTALL_PATH" != /* ]]; then
-  echo "error: CLI_INSTALL_PATH must be an absolute path, got: $CLI_INSTALL_PATH" >&2
+cli_install_path=$(<"$cli_install_path_file")
+if [[ "$cli_install_path" != /* ]]; then
+  echo "error: CLI install path must be absolute, got: $cli_install_path" >&2
+  exit 1
+fi
+if [[ "$(basename "$cli_install_path")" != "pswitcher" ]]; then
+  echo "error: CLI install path must end in /pswitcher, got: $cli_install_path" >&2
   exit 1
 fi
 if ! command -v create-dmg &>/dev/null; then
@@ -87,9 +93,9 @@ codesign --force --timestamp \
 pkg_name="pswitcher-v${VERSION}-macos-arm64.pkg"
 echo "Creating PKG: $pkg_name"
 
-# Determine install directory and binary name from CLI_INSTALL_PATH
-install_dir=$(dirname "$CLI_INSTALL_PATH")
-install_bin=$(basename "$CLI_INSTALL_PATH")
+# Determine install directory and binary name from the repository-owned path.
+install_dir=$(dirname "$cli_install_path")
+install_bin=$(basename "$cli_install_path")
 
 # Setup pkg root directory structure
 pkg_root="$RUNNER_TEMP/pkg-root"

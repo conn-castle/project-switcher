@@ -91,7 +91,7 @@ extension WindowRecoveryManagerTests {
 
         XCTAssertTrue(
             aerospace.moveWindowCalls.isEmpty,
-            "Titles with AP token in the middle should not be treated as project-routable windows"
+            "Titles with a ProjectSwitcher token in the middle should not be treated as project-routable windows"
         )
     }
 

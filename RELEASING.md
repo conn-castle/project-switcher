@@ -4,7 +4,7 @@ This document covers how to create a new release. Releases are built, signed, no
 
 ## Prerequisites
 
-The GitHub repository must have a `release` environment configured with the following secrets and variables. If your local `human_setup.md` runbook is unavailable, use the tables below as the source of truth.
+The GitHub repository must have a `release` environment configured with the following secrets. If your local `human_setup.md` runbook is unavailable, use the table below as the source of truth.
 
 The release workflow requires **Xcode 26+** and fails early when an older Xcode is selected. This keeps release artifacts aligned with the current CI/local toolchain baseline.
 
@@ -23,13 +23,7 @@ The release workflow requires **Xcode 26+** and fails early when an older Xcode 
 | `DEVELOPER_ID_APP_IDENTITY` | Full identity string (e.g., `Developer ID Application: Name (TEAMID)`) |
 | `DEVELOPER_ID_INSTALLER_IDENTITY` | Full identity string (e.g., `Developer ID Installer: Name (TEAMID)`) |
 
-### Variables (in `release` environment)
-
-| Variable | Value |
-|----------|-------|
-| `CLI_INSTALL_PATH` | `/usr/local/bin/pswitcher` |
-
-Note: The macOS deployment target is set in `project.yml` (single source of truth) and must not be overridden in CI. The tag prefix `v` is hardcoded in the workflow trigger.
+The CLI package destination is repository-controlled by `release/cli-install-path`; GitHub environment variables cannot override it. The macOS deployment target is set in `project.yml` and must not be overridden in CI. The tag prefix `v` is hardcoded in the workflow trigger.
 
 ## Creating a Release
 
@@ -93,6 +87,7 @@ The release workflow (`.github/workflows/release.yml`) runs on `macos-26` and:
    - `pswitcher-v<version>-macos-arm64.tar.gz` (CLI binary)
 11. Notarizes the DMG and PKG with Apple.
 12. Validates all artifacts (mounts DMG, verifies signatures, checks notarization).
+   - Confirms the PKG payload installs the CLI at the path in `release/cli-install-path`.
 13. Generates `SHA256SUMS`.
 14. Creates a GitHub Release with all artifacts attached.
 

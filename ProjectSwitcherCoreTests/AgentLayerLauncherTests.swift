@@ -64,7 +64,7 @@ final class AgentLayerLauncherTests: XCTestCase {
 
     // MARK: - Settings file contents
 
-    func testSettingsFileContainsAPTag() {
+    func testSettingsFileContainsProjectSwitcherTag() {
         let runner = MockALCommandRunner()
         runner.results = [
             .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),

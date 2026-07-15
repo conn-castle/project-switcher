@@ -256,6 +256,29 @@ else
   fail "Identity.swift not found at $identity_swift"
 fi
 
+# 14. CLI install path is repository-owned and canonical
+cli_install_path_file="$REPO_ROOT/release/cli-install-path"
+if [[ ! -f "$cli_install_path_file" ]]; then
+  fail "CLI install path file missing at release/cli-install-path"
+else
+  cli_install_path=$(<"$cli_install_path_file")
+  if [[ "$cli_install_path" != /* ]]; then
+    fail "CLI install path '$cli_install_path' is not absolute"
+  elif [[ "$(basename "$cli_install_path")" != "pswitcher" ]]; then
+    fail "CLI install path '$cli_install_path' does not use the canonical pswitcher binary name"
+  else
+    echo "PASS: CLI install path is repository-owned and canonical ($cli_install_path)"
+  fi
+fi
+
+if [[ -f "$workflow" ]]; then
+  if grep -q 'vars\.CLI_INSTALL_PATH\|CLI_INSTALL_PATH:' "$workflow"; then
+    fail "Release workflow overrides the repository-owned CLI install path"
+  else
+    echo "PASS: Release workflow does not override the CLI install path"
+  fi
+fi
+
 echo ""
 if [[ $errors -gt 0 ]]; then
   echo "=== $errors preflight check(s) FAILED ==="
