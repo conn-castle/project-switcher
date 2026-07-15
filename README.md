@@ -34,9 +34,9 @@ For users who want an uncluttered menu bar, it can be desirable to remove or hid
 ## Requirements
 
 - macOS 15.7 or later (Apple Silicon)
-- [AeroSpace](https://github.com/nikitabobko/AeroSpace) -- installed automatically on first launch if Homebrew is available
+- [AeroSpace](https://github.com/nikitabobko/AeroSpace) -- installed automatically from the official Homebrew tap on first launch; validated with `0.21.2-Beta`
 - [VS Code](https://code.visualstudio.com/)
-- [Google Chrome](https://www.google.com/chrome/)
+- [Google Chrome](https://www.google.com/chrome/) -- optional; required only for projects with Chrome integration enabled
 - [Homebrew](https://brew.sh/) -- for automatic AeroSpace installation
 
 Optional:
@@ -120,6 +120,7 @@ name = "ProjectSwitcher"
 path = "/Users/you/src/project-switcher"
 color = "indigo"
 useAgentLayer = true
+openChrome = false
 chromePinnedTabs = ["https://linear.app"]
 chromeDefaultTabs = ["https://docs.example.com"]
 
@@ -173,6 +174,7 @@ If permission is missing, ProjectSwitcher requests it automatically once per ins
 | `color` | string | yes | `"#RRGGBB"` hex or named color |
 | `remote` | string | no | VS Code SSH remote authority (e.g., `"ssh-remote+user@host"`) |
 | `useAgentLayer` | bool | no | Use Agent Layer launch path for this project |
+| `openChrome` | bool | no | Find or launch a project Chrome window (default: `true`); Chrome failures never block VS Code activation |
 | `chromePinnedTabs` | [string] | no | Per-project always-open tabs |
 | `chromeDefaultTabs` | [string] | no | Per-project default tabs (no history) |
 
@@ -311,7 +313,7 @@ Each finding includes a severity (PASS / WARN / FAIL) and an actionable fix. The
 
 - Release artifacts are macOS arm64 only (Apple Silicon).
 - Homebrew tap distribution is not yet available.
-- VS Code and Chrome are currently required for full project activation.
+- VS Code is required for project activation. Chrome integration is optional per project.
 
 ## Development
 

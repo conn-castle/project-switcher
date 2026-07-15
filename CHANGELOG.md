@@ -6,6 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-15
+
+### Added
+
+- **Optional Chrome integration** -- added per-project `openChrome` configuration so VS Code-only projects can skip Chrome activation, positioning, and capture work.
+- **Repeatable debugging procedure** -- added a current-path-only guide for collecting application and unified logs without exposing unrelated diagnostic data.
+
+### Changed
+
+- **Canonical ProjectSwitcher identity only** -- removed support for former config/state paths, log filenames, Visual Studio Code markers, window tokens, and workspace-recovery event names. Existing local data must be cut over to ProjectSwitcher paths before first launch.
+- **Best-effort Chrome activation** -- Chrome lookup, launch, movement, and arrival failures now surface warnings without blocking VS Code project activation.
+- **AeroSpace compatibility contract** -- global window searches now use the required `--monitor all` scope, readiness waits on a daemon-backed command, and compatibility checks require formatted workspace output.
+
+### Fixed
+
+- **Window token prefix collisions** -- window matching now requires a leading project token boundary, preventing one project ID from adopting windows belonging to a longer similarly prefixed ID.
+- **Chrome launch duplication** -- tag new Chrome windows before URL operations and identify a single newly created window while its title propagates, avoiding repeat launches after discovery timeouts.
+- **Transient Accessibility enumeration failures** -- classify `cannotComplete` window enumeration errors as retryable across activation, capture, and recovery paths.
+- **Duplicate switcher operations** -- guard concurrent activation and close requests until the active operation completes.
+- **Launch-at-login reconciliation** -- change registration only when configured and actual service states differ, with consistent structured failure logging.
+
 ## [0.2.0] - 2026-03-27
 
 ### Changed

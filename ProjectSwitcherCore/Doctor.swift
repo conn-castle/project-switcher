@@ -372,7 +372,8 @@ public struct Doctor {
         findings.append(contentsOf: checkApps(
             vscodeURL: configResult.vscodeURL,
             chromeURL: configResult.chromeURL,
-            hasValidProjects: configResult.hasValidProjects
+            hasValidProjects: configResult.hasValidProjects,
+            hasChromeProjects: configResult.hasChromeProjects
         ))
         sectionTimings["apps"] = Self.elapsedMs(since: sectionStart)
 
@@ -585,6 +586,7 @@ public struct Doctor {
     private struct ConfigAndProjectsResult {
         let findings: [DoctorFinding]
         let hasValidProjects: Bool
+        let hasChromeProjects: Bool
         let vscodeURL: URL?
         let chromeURL: URL?
     }
@@ -593,7 +595,7 @@ public struct Doctor {
     /// ProjectSwitcher config, and project paths.
     ///
     /// VS Code / Chrome URLs are detected here (alongside config) but their
-    /// findings are emitted in ``checkApps(vscodeURL:chromeURL:hasValidProjects:)``
+    /// findings are emitted in ``checkApps(vscodeURL:chromeURL:hasValidProjects:hasChromeProjects:)``
     /// because severity depends on whether projects are configured.
     ///
     /// - Returns: Findings and state needed by the apps section.
@@ -622,6 +624,7 @@ public struct Doctor {
 
         // Check ProjectSwitcher config
         var hasValidProjects = false
+        var hasChromeProjects = false
         switch ConfigLoader.load(from: dataStore.configFile) {
         case .failure(let error):
             findings.append(DoctorFinding(
@@ -646,6 +649,7 @@ public struct Doctor {
             }
 
             hasValidProjects = !result.projects.isEmpty
+            hasChromeProjects = result.projects.contains(where: { $0.openChrome })
 
             // Check agent-layer CLI if any project uses it
             let agentLayerProjects = result.projects.filter { $0.useAgentLayer }
@@ -683,6 +687,7 @@ public struct Doctor {
         return ConfigAndProjectsResult(
             findings: findings,
             hasValidProjects: hasValidProjects,
+            hasChromeProjects: hasChromeProjects,
             vscodeURL: vscodeURL,
             chromeURL: chromeURL
         )
@@ -695,9 +700,15 @@ public struct Doctor {
     /// - Parameters:
     ///   - vscodeURL: VS Code application URL (nil if not found).
     ///   - chromeURL: Chrome application URL (nil if not found).
-    ///   - hasValidProjects: Whether any valid projects are configured (affects severity).
+    ///   - hasValidProjects: Whether any valid projects are configured (affects VS Code severity).
+    ///   - hasChromeProjects: Whether any project has Chrome integration enabled.
     /// - Returns: Findings for the apps section.
-    private func checkApps(vscodeURL: URL?, chromeURL: URL?, hasValidProjects: Bool) -> [DoctorFinding] {
+    private func checkApps(
+        vscodeURL: URL?,
+        chromeURL: URL?,
+        hasValidProjects: Bool,
+        hasChromeProjects: Bool
+    ) -> [DoctorFinding] {
         var findings: [DoctorFinding] = []
 
         if let vscodeURL {
@@ -722,13 +733,18 @@ public struct Doctor {
                 title: "Google Chrome installed",
                 detail: chromeURL.path
             ))
-        } else {
-            let severity: DoctorSeverity = hasValidProjects ? .fail : .warn
+        } else if hasChromeProjects {
             findings.append(DoctorFinding(
-                severity: severity,
+                severity: .warn,
                 title: "Google Chrome not found",
-                detail: "Required for browser window management",
-                fix: "Install: brew install --cask google-chrome"
+                detail: "Projects with openChrome enabled will continue with VS Code only",
+                fix: "Install Chrome or set openChrome = false for projects that do not need it"
+            ))
+        } else {
+            findings.append(DoctorFinding(
+                severity: .pass,
+                title: "Google Chrome not required",
+                detail: "Chrome integration is disabled for all configured projects"
             ))
         }
 
@@ -977,7 +993,8 @@ public struct Doctor {
     /// Checks whether the SSH project's remote `.vscode/settings.json` contains the project-switcher block.
     ///
     /// - PASS: File exists and contains `// >>> project-switcher`.
-    /// - WARN: File is missing, missing the block, or SSH fails. Includes actionable snippet.
+    /// - WARN: File is missing, missing the block, or SSH cannot complete the check.
+    ///   Confirmed content problems include an actionable snippet; transport failures do not.
     private func checkSSHSettingsBlock(project: ProjectConfig) -> [DoctorFinding] {
         guard let remoteAuthority = project.remote?.trimmingCharacters(in: .whitespacesAndNewlines),
               !remoteAuthority.isEmpty else {
@@ -1010,7 +1027,7 @@ public struct Doctor {
                 "-o", "BatchMode=yes",
                 "--",
                 sshTarget,
-                "cat \(settingsPath)"
+                "if test -f \(settingsPath); then cat \(settingsPath); else exit 44; fi"
             ],
             timeoutSeconds: 3
         )
@@ -1027,12 +1044,10 @@ public struct Doctor {
 
         switch result {
         case .failure(let error):
-            return [makeSettingsWarnFinding(
+            return [makeSettingsUnavailableFinding(
                 project: project,
-                remotePath: remotePath,
-                blockContent: blockContent,
-                fileExists: false,
-                checkErrorDetail: error.message
+                detail: error.message,
+                sshTarget: sshTarget
             )]
         case .success(let cmdResult):
             if cmdResult.exitCode == 0
@@ -1042,19 +1057,26 @@ public struct Doctor {
                     severity: .pass,
                     title: "Remote VS Code settings block present: \(project.id)"
                 )]
-            } else {
-                let fileExists = cmdResult.exitCode == 0 && !cmdResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                let checkErrorDetail: String? = {
-                    guard cmdResult.exitCode != 0 else { return nil }
-                    let trimmed = cmdResult.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return trimmed.isEmpty ? "SSH command failed (exit \(cmdResult.exitCode))" : trimmed
-                }()
+            } else if cmdResult.exitCode == 44 {
                 return [makeSettingsWarnFinding(
                     project: project,
                     remotePath: remotePath,
                     blockContent: blockContent,
-                    fileExists: fileExists,
-                    checkErrorDetail: checkErrorDetail
+                    fileExists: false
+                )]
+            } else if cmdResult.exitCode != 0 {
+                let stderr = cmdResult.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                return [makeSettingsUnavailableFinding(
+                    project: project,
+                    detail: stderr.isEmpty ? "SSH command failed (exit \(cmdResult.exitCode))" : stderr,
+                    sshTarget: sshTarget
+                )]
+            } else {
+                return [makeSettingsWarnFinding(
+                    project: project,
+                    remotePath: remotePath,
+                    blockContent: blockContent,
+                    fileExists: true
                 )]
             }
         }
@@ -1065,8 +1087,7 @@ public struct Doctor {
         project: ProjectConfig,
         remotePath: String,
         blockContent: String,
-        fileExists: Bool,
-        checkErrorDetail: String?
+        fileExists: Bool
     ) -> DoctorFinding {
         let name = ProjectSwitcher.displayName
         let fixText: String
@@ -1089,11 +1110,24 @@ public struct Doctor {
         return DoctorFinding(
             severity: .warn,
             title: "Remote .vscode/settings.json missing \(name) block: \(project.id)",
-            detail: checkErrorDetail.map { "Could not read remote .vscode/settings.json: \($0)" }
-                ?? "\(name) cannot reliably identify the VS Code window for this SSH project until the \(name) settings block exists and is writable via SSH.",
+            detail: "\(name) cannot reliably identify the VS Code window for this SSH project until the \(name) settings block exists and is writable via SSH.",
             fix: fixText,
             snippet: snippet,
             snippetLanguage: "jsonc"
+        )
+    }
+
+    /// Builds a warning when SSH did not provide enough evidence to inspect remote settings.
+    private func makeSettingsUnavailableFinding(
+        project: ProjectConfig,
+        detail: String,
+        sshTarget: String
+    ) -> DoctorFinding {
+        DoctorFinding(
+            severity: .warn,
+            title: "Cannot check remote VS Code settings for \(project.id)",
+            detail: detail,
+            fix: "Check SSH configuration and network connectivity to \(sshTarget)."
         )
     }
 

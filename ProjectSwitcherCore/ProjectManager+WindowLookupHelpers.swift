@@ -20,8 +20,13 @@ extension ProjectManager {
     /// - `focusedWindow().workspace` matching the target workspace.
     func ensureWorkspaceFocused(name: String) async -> Bool {
         let deadline = Date().addingTimeInterval(windowPollTimeout)
+        var attemptCount = 0
 
-        while Date() < deadline {
+        // AeroSpace recovery can consume the entire nominal polling window. Always
+        // allow a second focus/verification cycle so a command that recovers the
+        // daemon near the deadline can actually apply and verify the requested focus.
+        while attemptCount < 2 || Date() < deadline {
+            attemptCount += 1
             // Always attempt focus first (summon-workspace pulls workspace to current monitor)
             _ = aerospace.focusWorkspace(name: name)
 
@@ -62,21 +67,48 @@ extension ProjectManager {
                      context: ["app_bundle_id": appBundleId, "project_id": projectId])
             return nil
         }
-        let token = "\(PsIdeToken.prefix)\(projectId)"
-        return windows.first { $0.windowTitle.contains(token) }
+        return windows.first {
+            PsIdeToken.matches(windowTitle: $0.windowTitle, projectId: projectId)
+        }
     }
 
     /// Polls for a tagged window to appear after launch.
     func pollForWindowByToken(
         appBundleId: String,
         projectId: String,
-        windowLabel: String
+        windowLabel: String,
+        newWindowBaselineIds: Set<Int>? = nil
     ) async -> Result<PsWindow, ProjectError> {
         let deadline = Date().addingTimeInterval(windowPollTimeout)
+        let fallbackEligibleAt = Date().addingTimeInterval(min(0.5, windowPollTimeout / 2))
 
         while Date() < deadline {
-            if let window = findWindowByToken(appBundleId: appBundleId, projectId: projectId) {
-                return .success(window)
+            switch aerospace.listWindowsForApp(bundleId: appBundleId) {
+            case .success(let windows):
+                if let window = windows.first(where: {
+                    PsIdeToken.matches(windowTitle: $0.windowTitle, projectId: projectId)
+                }) {
+                    return .success(window)
+                }
+
+                // Prefer the authoritative title token for a brief grace period.
+                // This prevents an unrelated Chrome popup created concurrently from
+                // being adopted before the launched window's title has propagated.
+                if Date() >= fallbackEligibleAt, let baselineIds = newWindowBaselineIds {
+                    let newWindows = windows.filter { !baselineIds.contains($0.windowId) }
+                    if newWindows.count == 1, let newWindow = newWindows.first {
+                        logEvent("window_lookup.new_window_fallback", level: .warn, context: [
+                            "app_bundle_id": appBundleId,
+                            "project_id": projectId,
+                            "window_id": "\(newWindow.windowId)"
+                        ])
+                        return .success(newWindow)
+                    }
+                }
+            case .failure(let error):
+                logEvent("window_lookup.list_failed", level: .warn,
+                         message: error.message,
+                         context: ["app_bundle_id": appBundleId, "project_id": projectId])
             }
             try? await Task.sleep(nanoseconds: UInt64(windowPollInterval * 1_000_000_000))
         }
@@ -84,10 +116,12 @@ extension ProjectManager {
         return .failure(.windowNotFound(detail: "\(windowLabel) window did not appear within timeout"))
     }
 
-    /// Polls until both windows are in the target workspace.
-    func pollForWindowsInWorkspace(chromeWindowId: Int, ideWindowId: Int, workspace: String) async -> Result<Void, ProjectError> {
+    /// Polls until the IDE is in the target workspace and reports whether optional Chrome arrived.
+    func pollForWindowsInWorkspace(chromeWindowId: Int?, ideWindowId: Int, workspace: String) async -> Result<Bool, ProjectError> {
         let deadline = Date().addingTimeInterval(windowPollTimeout)
         var loggedQueryFailure = false
+        var ideArrived = false
+        var optionalChromeDeadline: Date?
 
         while Date() < deadline {
             switch aerospace.listWindowsWorkspace(workspace: workspace) {
@@ -100,16 +134,28 @@ extension ProjectManager {
                 }
             case .success(let windows):
                 let windowIds = Set(windows.map { $0.windowId })
-                if windowIds.contains(chromeWindowId) && windowIds.contains(ideWindowId) {
+                ideArrived = ideArrived || windowIds.contains(ideWindowId)
+                let chromeArrived = chromeWindowId.map(windowIds.contains) ?? true
+                if ideArrived && chromeArrived {
                     logEvent("select.windows_verified_in_workspace", context: ["workspace": workspace])
-                    return .success(())
+                    return .success(true)
+                }
+                if ideArrived, chromeWindowId != nil {
+                    if optionalChromeDeadline == nil {
+                        optionalChromeDeadline = Date().addingTimeInterval(min(0.5, windowPollTimeout / 2))
+                    } else if let optionalChromeDeadline, Date() >= optionalChromeDeadline {
+                        return .success(false)
+                    }
                 }
             }
 
             try? await Task.sleep(nanoseconds: UInt64(windowPollInterval * 1_000_000_000))
         }
 
-        return .failure(.aeroSpaceError(detail: "Windows did not arrive in workspace within timeout"))
+        if ideArrived {
+            return .success(false)
+        }
+        return .failure(.aeroSpaceError(detail: "IDE window did not arrive in workspace within timeout"))
     }
 
 }

@@ -37,6 +37,17 @@ public struct AXWindowPositioner: WindowPositioning {
         )
     }
 
+    /// Creates an enumeration error, preserving whether Accessibility reported a
+    /// transient `cannotComplete` response so callers can retry it safely.
+    static func windowEnumerationError(bundleId: String, axError: AXError) -> PsCoreError {
+        PsCoreError(
+            category: .window,
+            message: "Failed to enumerate windows for \(bundleId)",
+            detail: "AX error: \(axError.rawValue) (may indicate missing Accessibility permission)",
+            reason: axError == .cannotComplete ? .windowEnumerationIncomplete : nil
+        )
+    }
+
     // MARK: - WindowPositioning Protocol
 
     public func getPrimaryWindowFrame(bundleId: String, projectId: String) -> Result<CGRect, PsCoreError> {

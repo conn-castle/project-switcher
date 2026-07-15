@@ -215,7 +215,111 @@ final class SwitcherOperationCoordinatorTests: XCTestCase {
         XCTAssertTrue(searchFieldFocusOnMainThread, "onRestoreSearchFieldFocus must run on main thread")
     }
 
+    func testHandleProjectSelectionIgnoresDuplicateWhileActivationIsInProgress() async {
+        let logger = CoordinatorTestRecordingLogger()
+        let aerospace = CoordinatorTestAeroSpaceStub()
+        let workspaceQuerySemaphore = DispatchSemaphore(value: 0)
+        aerospace.listWorkspacesWithFocusWaitSemaphore = workspaceQuerySemaphore
+
+        let projectId = "alpha"
+        let workspace = "ps-\(projectId)"
+        let chromeWindow = PsWindow(
+            windowId: 100,
+            appBundleId: PsChromeLauncher.bundleId,
+            workspace: workspace,
+            windowTitle: "PS:\(projectId) - Chrome"
+        )
+        let ideWindow = PsWindow(
+            windowId: 101,
+            appBundleId: PsVSCodeLauncher.bundleId,
+            workspace: workspace,
+            windowTitle: "PS:\(projectId) - VS Code"
+        )
+        aerospace.windowsByBundleId[PsChromeLauncher.bundleId] = [chromeWindow]
+        aerospace.windowsByBundleId[PsVSCodeLauncher.bundleId] = [ideWindow]
+        aerospace.windowsByWorkspace[workspace] = [chromeWindow, ideWindow]
+        aerospace.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: workspace, isFocused: true)
+        ])
+        aerospace.focusedWindowResult = .success(ideWindow)
+        aerospace.focusWindowSuccessIds = [ideWindow.windowId]
+
+        let (coordinator, manager) = makeOperationCoordinator(aerospace: aerospace, logger: logger)
+        let project = ProjectConfig(
+            id: projectId,
+            name: "Alpha",
+            path: "/tmp/alpha",
+            color: "blue",
+            useAgentLayer: false
+        )
+        manager.loadTestConfig(Config(projects: [project], chrome: ChromeConfig()))
+
+        let completion = expectation(description: "activation completes")
+        logger.onLog = { entry in
+            if entry.event == "project_manager.select.completed" {
+                completion.fulfill()
+            }
+        }
+
+        coordinator.handleProjectSelection(project, capturedFocus: nil)
+        coordinator.handleProjectSelection(project, capturedFocus: nil)
+
+        XCTAssertEqual(
+            logger.entriesSnapshot().filter { $0.event == "switcher.project.selected" }.count,
+            1
+        )
+        XCTAssertEqual(
+            logger.entriesSnapshot().filter { $0.event == "switcher.project.selection_skipped" }.count,
+            1
+        )
+
+        workspaceQuerySemaphore.signal()
+        await fulfillment(of: [completion], timeout: 5.0)
+    }
+
     // MARK: - handleExitToNonProject
+
+    func testPerformCloseProjectGuardsOperationUntilCloseCompletes() async {
+        let logger = CoordinatorTestRecordingLogger()
+        let aerospace = CoordinatorTestAeroSpaceStub()
+        let closeSemaphore = DispatchSemaphore(value: 0)
+        aerospace.closeWorkspaceWaitSemaphore = closeSemaphore
+
+        let (coordinator, manager) = makeOperationCoordinator(aerospace: aerospace, logger: logger)
+        let project = ProjectConfig(
+            id: "alpha",
+            name: "Alpha",
+            path: "/tmp/alpha",
+            color: "blue",
+            useAgentLayer: false
+        )
+        manager.loadTestConfig(Config(projects: [project], chrome: ChromeConfig()))
+
+        var controlsEnabledHistory: [Bool] = []
+        coordinator.onSetControlsEnabled = { controlsEnabledHistory.append($0) }
+        let completionExpectation = expectation(description: "close completes")
+        logger.onLog = { entry in
+            if entry.event == "switcher.close_project.succeeded" {
+                completionExpectation.fulfill()
+            }
+        }
+
+        coordinator.performCloseProject(
+            projectId: project.id,
+            projectName: project.name,
+            source: "test",
+            fallbackSelectionKey: nil
+        )
+
+        XCTAssertTrue(coordinator.isClosingProject)
+        XCTAssertEqual(controlsEnabledHistory, [false])
+
+        closeSemaphore.signal()
+        await fulfillment(of: [completionExpectation], timeout: 3.0)
+
+        XCTAssertFalse(coordinator.isClosingProject)
+        XCTAssertEqual(controlsEnabledHistory, [false, true])
+    }
 
     func testHandleExitToNonProjectGuardsAgainstDoubleFire() async {
         let logger = CoordinatorTestRecordingLogger()

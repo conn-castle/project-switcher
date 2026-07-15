@@ -77,19 +77,19 @@ public struct ProjectWorkspaceState: Equatable, Sendable {
 public struct ProjectActivationSuccess: Equatable, Sendable {
     /// AeroSpace window ID for the IDE window (used for post-dismissal focusing).
     public let ideWindowId: Int
-    /// Warning message if tab restore failed (non-fatal).
-    public let tabRestoreWarning: String?
+    /// Warning message if optional Chrome setup failed (non-fatal).
+    public let chromeWarning: String?
     /// Warning message if window positioning failed (non-fatal).
     public let layoutWarning: String?
 
     /// Creates a new activation success result.
     /// - Parameters:
     ///   - ideWindowId: AeroSpace window ID for the IDE window.
-    ///   - tabRestoreWarning: Optional non-fatal warning if tab restore failed.
+    ///   - chromeWarning: Optional non-fatal warning if Chrome setup failed.
     ///   - layoutWarning: Optional non-fatal warning if window positioning failed.
-    public init(ideWindowId: Int, tabRestoreWarning: String?, layoutWarning: String? = nil) {
+    public init(ideWindowId: Int, chromeWarning: String?, layoutWarning: String? = nil) {
         self.ideWindowId = ideWindowId
-        self.tabRestoreWarning = tabRestoreWarning
+        self.chromeWarning = chromeWarning
         self.layoutWarning = layoutWarning
     }
 }
@@ -179,4 +179,3 @@ struct FocusStack {
         entries
     }
 }
-

@@ -31,7 +31,7 @@ extension PsCLIRunnerTests {
         let manager = MockProjectManager()
         manager.loadConfigResult = .success(makeConfig(projectIds: ["a"]))
         manager.captureCurrentFocusResult = CapturedFocus(windowId: 1, appBundleId: "app", workspace: "main")
-        manager.selectProjectResult = .success(ProjectActivationSuccess(ideWindowId: 42, tabRestoreWarning: "tabs failed"))
+        manager.selectProjectResult = .success(ProjectActivationSuccess(ideWindowId: 42, chromeWarning: "tabs failed"))
 
         let deps = PsCLIDependencies(
             version: { "0.0.0" },
@@ -118,7 +118,7 @@ extension PsCLIRunnerTests {
         manager.selectProjectResult = .success(
             ProjectActivationSuccess(
                 ideWindowId: 42,
-                tabRestoreWarning: nil,
+                chromeWarning: nil,
                 layoutWarning: "layout not applied"
             )
         )

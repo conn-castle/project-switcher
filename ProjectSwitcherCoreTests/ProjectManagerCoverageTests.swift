@@ -227,7 +227,7 @@ final class ProjectManagerCoverageTests: XCTestCase {
             XCTFail("Expected success, got error: \(error)")
         case .success(let success):
             XCTAssertEqual(success.ideWindowId, 201)
-            XCTAssertEqual(success.tabRestoreWarning, "Chrome launched without tabs (tab restore failed)")
+            XCTAssertEqual(success.chromeWarning, "Chrome launched without tabs (tab restore failed)")
         }
     }
 

@@ -37,6 +37,8 @@ public enum PsCoreErrorReason: String, Sendable {
     case windowTokenNotFound
     /// Error was returned because window enumeration confirmed the app has zero windows.
     case windowInventoryEmpty
+    /// Accessibility window enumeration was temporarily unable to complete.
+    case windowEnumerationIncomplete
 }
 
 /// Errors emitted by ProjectSwitcherCore operations.
@@ -111,6 +113,14 @@ public struct PsCoreError: Error, Equatable, Sendable {
             return true
         }
         return message.hasPrefix("No window found with token")
+    }
+
+    /// Whether a window lookup failed for a condition that can resolve after a short delay.
+    ///
+    /// A title token can propagate after the window appears, and the Accessibility API can
+    /// briefly return `cannotComplete` while an application is updating its window tree.
+    public var isTransientWindowLookupFailure: Bool {
+        isWindowTokenNotFound || reason == .windowEnumerationIncomplete
     }
 
     /// Whether this error originates from a stale AeroSpace tree-node state.

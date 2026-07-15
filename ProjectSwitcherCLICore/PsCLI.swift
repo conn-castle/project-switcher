@@ -146,7 +146,7 @@ public struct PsCLI {
                     output.stderr("error: \(formatProjectError(error))")
                     return PsExitCode.failure.rawValue
                 case .success(let activation):
-                    if let warning = activation.tabRestoreWarning {
+                    if let warning = activation.chromeWarning {
                         output.stderr("warning: \(warning)")
                     }
                     if let warning = activation.layoutWarning {

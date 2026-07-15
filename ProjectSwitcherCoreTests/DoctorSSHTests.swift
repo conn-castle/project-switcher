@@ -195,7 +195,7 @@ final class DoctorSSHTests: XCTestCase {
         })
     }
 
-    func testRunReportsVSCodeAndChromeFailWhenProjectsConfigured() throws {
+    func testRunReportsVSCodeFailureAndOptionalChromeWarningWhenProjectsConfigured() throws {
         let toml = """
         [[project]]
         name = "Local"
@@ -215,11 +215,11 @@ final class DoctorSSHTests: XCTestCase {
             $0.severity == .fail && $0.title.contains("VS Code not found")
         }, "VS Code missing should be FAIL when projects are configured")
         XCTAssertTrue(report.findings.contains {
-            $0.severity == .fail && $0.title.contains("Google Chrome not found")
-        }, "Chrome missing should be FAIL when projects are configured")
+            $0.severity == .warn && $0.title.contains("Google Chrome not found")
+        }, "Optional Chrome must not make Doctor fail")
     }
 
-    func testRunReportsVSCodeAndChromeWarnWhenNoProjectsConfigured() throws {
+    func testRunReportsVSCodeWarningAndChromeNotRequiredWhenNoProjectsConfigured() throws {
         // Config with no valid projects — all required fields missing
         let toml = """
         [[project]]
@@ -238,8 +238,8 @@ final class DoctorSSHTests: XCTestCase {
             $0.severity == .warn && $0.title.contains("VS Code not found")
         }, "VS Code missing should be WARN when no valid projects are configured")
         XCTAssertTrue(report.findings.contains {
-            $0.severity == .warn && $0.title.contains("Google Chrome not found")
-        }, "Chrome missing should be WARN when no valid projects are configured")
+            $0.severity == .pass && $0.title.contains("Google Chrome not required")
+        }, "Chrome should not warn when no configured project enables it")
     }
 
     func testRunReportsAgentLayerCliMissingWhenRequiredByConfig() throws {
@@ -745,7 +745,7 @@ final class DoctorSSHTests: XCTestCase {
         XCTAssertTrue(finding?.snippet?.contains("// >>> project-switcher") == true)
     }
 
-    func testSSHSettingsBlockSSHFails255Warns() {
+    func testSSHSettingsBlockSSHFails255ReportsCheckUnavailable() {
         let runner = SequentialCommandRunner(results: [
             .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),        // path check
             .success(PsCommandResult(exitCode: 255, stdout: "", stderr: "Connection refused"))  // settings check fails
@@ -759,9 +759,10 @@ final class DoctorSSHTests: XCTestCase {
         let report = doctor.run()
 
         let finding = report.findings.first {
-            $0.severity == .warn && $0.title.contains("Remote .vscode/settings.json missing ProjectSwitcher block: remote-ml")
+            $0.severity == .warn && $0.title.contains("Cannot check remote VS Code settings for remote-ml")
         }
         XCTAssertNotNil(finding)
+        XCTAssertNil(finding?.snippet)
     }
 
     func testSSHSettingsBlockSSHNotFoundWarns() {
@@ -781,10 +782,30 @@ final class DoctorSSHTests: XCTestCase {
         })
     }
 
-    func testSSHSettingsBlockSnippetUsesJsoncLanguage() {
+    func testSSHSettingsBlockRunnerFailureHasNoMisleadingSnippet() {
         let runner = SequentialCommandRunner(results: [
             .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),
             .failure(PsCoreError(message: "SSH failed"))
+        ])
+        let doctor = makeDoctor(
+            sshResult: .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),
+            sshResolvable: true,
+            commandRunner: runner
+        )
+
+        let report = doctor.run()
+
+        let finding = report.findings.first {
+            $0.severity == .warn && $0.title.contains("Cannot check remote VS Code settings")
+        }
+        XCTAssertNotNil(finding)
+        XCTAssertNil(finding?.snippet)
+    }
+
+    func testSSHSettingsBlockMissingFileWarnsWithCreationSnippet() {
+        let runner = SequentialCommandRunner(results: [
+            .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),
+            .success(PsCommandResult(exitCode: 44, stdout: "", stderr: ""))
         ])
         let doctor = makeDoctor(
             sshResult: .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),
@@ -799,6 +820,24 @@ final class DoctorSSHTests: XCTestCase {
         }
         XCTAssertNotNil(finding)
         XCTAssertEqual(finding?.snippetLanguage, "jsonc")
+        XCTAssertTrue(finding?.bodyLines.contains(where: { $0.contains("Create or update") }) == true)
+    }
+
+    func testSSHSettingsCommandUsesDistinctMissingFileExitCode() {
+        let runner = StubCommandRunner(
+            result: .success(PsCommandResult(exitCode: 0, stdout: "{}", stderr: ""))
+        )
+        let doctor = makeDoctor(
+            sshResult: .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),
+            sshResolvable: true,
+            commandRunner: runner
+        )
+
+        _ = doctor.run()
+
+        XCTAssertTrue(runner.allArguments.contains { arguments in
+            arguments.last?.contains("else exit 44") == true
+        })
     }
 
     // MARK: - Concurrent SSH checks

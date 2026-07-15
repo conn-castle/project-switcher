@@ -123,6 +123,39 @@ final class LaunchAtLoginTogglerTests: XCTestCase {
     }
 }
 
+final class LaunchAtLoginSynchronizerTests: XCTestCase {
+    func testDisabledConfigDoesNotUnregisterServiceThatIsNotEnabled() {
+        let service = LaunchAtLoginServiceStub(initialEnabled: false)
+        let synchronizer = LaunchAtLoginSynchronizer(service: service)
+
+        let logs = synchronizer.sync(configValue: false)
+
+        XCTAssertTrue(logs.isEmpty)
+        XCTAssertEqual(service.unregisterCalls, 0)
+    }
+
+    func testDisabledConfigUnregistersEnabledService() {
+        let service = LaunchAtLoginServiceStub(initialEnabled: true)
+        let synchronizer = LaunchAtLoginSynchronizer(service: service)
+
+        let logs = synchronizer.sync(configValue: false)
+
+        XCTAssertEqual(logs.map(\.event), ["launch_at_login.unregistered"])
+        XCTAssertEqual(service.unregisterCalls, 1)
+        XCTAssertFalse(service.isEnabled)
+    }
+
+    func testEnabledConfigDoesNotRegisterEnabledServiceAgain() {
+        let service = LaunchAtLoginServiceStub(initialEnabled: true)
+        let synchronizer = LaunchAtLoginSynchronizer(service: service)
+
+        let logs = synchronizer.sync(configValue: true)
+
+        XCTAssertTrue(logs.isEmpty)
+        XCTAssertEqual(service.registerCalls, 0)
+    }
+}
+
 private struct LaunchAtLoginTestError: Error, LocalizedError {
     private let detail: String
 
@@ -137,6 +170,8 @@ private struct LaunchAtLoginTestError: Error, LocalizedError {
 
 private final class LaunchAtLoginServiceStub: LaunchAtLoginServiceManaging {
     private(set) var isEnabled: Bool
+    private(set) var registerCalls = 0
+    private(set) var unregisterCalls = 0
     var registerResults: [Result<Void, Error>] = []
     var unregisterResults: [Result<Void, Error>] = []
 
@@ -145,6 +180,7 @@ private final class LaunchAtLoginServiceStub: LaunchAtLoginServiceManaging {
     }
 
     func register() throws {
+        registerCalls += 1
         switch dequeue(resultFrom: &registerResults) {
         case .success:
             isEnabled = true
@@ -154,6 +190,7 @@ private final class LaunchAtLoginServiceStub: LaunchAtLoginServiceManaging {
     }
 
     func unregister() throws {
+        unregisterCalls += 1
         switch dequeue(resultFrom: &unregisterResults) {
         case .success:
             isEnabled = false

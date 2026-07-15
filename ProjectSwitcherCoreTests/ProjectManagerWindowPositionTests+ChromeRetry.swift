@@ -5,6 +5,44 @@ import XCTest
 extension ProjectManagerWindowPositionTests {
     // MARK: - Chrome Set Retry + Fallback Tests
 
+    func testIDEFrameReadRetriesTransientEnumerationFailure() async {
+        let projectId = "ide-enum-retry"
+        let positioner = RecordingWindowPositioner()
+        let store = RecordingPositionStore()
+        let detector = StubScreenModeDetector()
+        let aerospace = SimpleAeroSpaceStub(projectId: projectId)
+
+        let transientEnumerationError = PsCoreError(
+            category: .window,
+            message: "Failed to enumerate windows for com.microsoft.VSCode",
+            reason: .windowEnumerationIncomplete
+        )
+        positioner.getFrameSequences["com.microsoft.VSCode|\(projectId)"] = [
+            .failure(transientEnumerationError),
+            .success(defaultIdeFrame)
+        ]
+
+        let manager = makeManager(
+            aerospace: aerospace,
+            windowPositioner: positioner,
+            windowPositionStore: store,
+            screenModeDetector: detector,
+            windowPollInterval: 0.001
+        )
+        manager.loadTestConfig(Config(
+            projects: [ProjectConfig(id: projectId, name: "IDE retry", path: "/tmp/ide-retry", color: "blue", useAgentLayer: false)]
+        ))
+
+        let result = await manager.selectProject(
+            projectId: projectId,
+            preCapturedFocus: CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
+        )
+
+        if case .failure(let error) = result { XCTFail("Expected retry to recover: \(error)") }
+        let ideReads = positioner.getFrameCalls.filter { $0.bundleId == "com.microsoft.VSCode" }
+        XCTAssertEqual(ideReads.count, 2)
+    }
+
     func testChromeSetRetriesAndSucceeds() async {
         let projectId = "cs-retry-1"
         let positioner = RecordingWindowPositioner()

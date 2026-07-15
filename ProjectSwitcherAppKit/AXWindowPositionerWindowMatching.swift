@@ -60,11 +60,7 @@ extension AXWindowPositioner {
         }
 
         if !anyEnumerationSucceeded, let axError = lastEnumerationError {
-            return .failure(PsCoreError(
-                category: .window,
-                message: "Failed to enumerate windows for \(bundleId)",
-                detail: "AX error: \(axError.rawValue) (may indicate missing Accessibility permission)"
-            ))
+            return .failure(Self.windowEnumerationError(bundleId: bundleId, axError: axError))
         }
 
         return .success(nil) // No matching window
@@ -110,7 +106,8 @@ extension AXWindowPositioner {
             anyEnumerationSucceeded = true
             for window in windows {
                 AXUIElementSetMessagingTimeout(window, Self.axTimeoutSeconds)
-                if let title = readTitle(element: window, bundleId: bundleId), title.contains(token) {
+                if let title = readTitle(element: window, bundleId: bundleId),
+                   Self.matchesLeadingToken(title: title, token: token) {
                     allMatches.append((title: title, element: window, enumIndex: nextEnumIndex))
                 }
                 nextEnumIndex += 1
@@ -119,11 +116,7 @@ extension AXWindowPositioner {
 
         // If no PID succeeded enumeration, surface the AX error rather than returning empty success
         if !anyEnumerationSucceeded, let axError = lastEnumerationError {
-            return .failure(PsCoreError(
-                category: .window,
-                message: "Failed to enumerate windows for \(bundleId)",
-                detail: "AX error: \(axError.rawValue) (may indicate missing Accessibility permission)"
-            ))
+            return .failure(Self.windowEnumerationError(bundleId: bundleId, axError: axError))
         }
 
         // Sort by title for stable ordering; secondary sort by enumeration index.
@@ -139,6 +132,14 @@ extension AXWindowPositioner {
         }
 
         return .success(allMatches.map { $0.element })
+    }
+
+    /// Matches a leading token at an identifier boundary (`PS:foo` must not match `PS:foo-copy`).
+    static func matchesLeadingToken(title: String, token: String) -> Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix(token) else { return false }
+        let suffix = trimmed.dropFirst(token.count)
+        return suffix.isEmpty || suffix.first?.isWhitespace == true
     }
 
     // MARK: - Fallback Window Resolution

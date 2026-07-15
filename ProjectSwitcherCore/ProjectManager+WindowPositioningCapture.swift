@@ -8,7 +8,8 @@ extension ProjectManager {
         guard let positioner = windowPositioner,
               let detector = screenModeDetector,
               let store = windowPositionStore,
-              let config = withState({ config }) else {
+              let config = withState({ config }),
+              let project = config.projects.first(where: { $0.id == projectId }) else {
             return
         }
 
@@ -22,46 +23,50 @@ extension ProjectManager {
             return
         }
 
-        // Read Chrome primary frame with bounded retry + fallback.
-        // Chrome title is set synchronously via AppleScript but AX visibility can lag.
         let captureRetryInterval = windowPollInterval // ~0.1s default, injectable for tests
         let chromeFrame: CGRect?
-        let (chromeCaptureResult, chromeCaptureAttempts, chromeCaptureUsedFallback) = await retryTransientWindowOp(
-            maxRetries: 5,
-            retryInterval: captureRetryInterval,
-            operation: {
-                positioner.getPrimaryWindowFrame(bundleId: PsChromeLauncher.bundleId, projectId: projectId)
-            },
-            fallback: {
-                positioner.getFallbackWindowFrame(bundleId: PsChromeLauncher.bundleId)
+        if project.openChrome {
+            // Chrome title is set synchronously via AppleScript but AX visibility can lag.
+            let (chromeCaptureResult, chromeCaptureAttempts, chromeCaptureUsedFallback) = await retryTransientWindowOp(
+                maxRetries: 5,
+                retryInterval: captureRetryInterval,
+                operation: {
+                    positioner.getPrimaryWindowFrame(bundleId: PsChromeLauncher.bundleId, projectId: projectId)
+                },
+                fallback: {
+                    positioner.getFallbackWindowFrame(bundleId: PsChromeLauncher.bundleId)
+                }
+            )
+            switch chromeCaptureResult {
+            case .success(let frame):
+                if chromeCaptureUsedFallback {
+                    logEvent("capture_position.chrome_fallback_used", level: .warn, context: [
+                        "project_id": projectId,
+                        "attempts": "\(chromeCaptureAttempts)"
+                    ])
+                } else if chromeCaptureAttempts > 1 {
+                    logEvent("capture_position.chrome_read_retried", context: [
+                        "project_id": projectId,
+                        "attempts": "\(chromeCaptureAttempts)"
+                    ])
+                }
+                chromeFrame = frame
+            case .failure(let error):
+                let captureFailMsg = chromeCaptureUsedFallback
+                    ? "Token retry exhausted and fallback failed: \(error.message)"
+                    : "Chrome frame unavailable: \(error.message)"
+                logEvent("capture_position.chrome_read_failed", level: .warn,
+                         message: captureFailMsg,
+                         context: ["project_id": projectId, "attempts": "\(chromeCaptureAttempts)"])
+                chromeFrame = nil
             }
-        )
-        switch chromeCaptureResult {
-        case .success(let frame):
-            if chromeCaptureUsedFallback {
-                logEvent("capture_position.chrome_fallback_used", level: .warn, context: [
-                    "project_id": projectId,
-                    "attempts": "\(chromeCaptureAttempts)"
-                ])
-            } else if chromeCaptureAttempts > 1 {
-                logEvent("capture_position.chrome_read_retried", context: [
-                    "project_id": projectId,
-                    "attempts": "\(chromeCaptureAttempts)"
-                ])
-            }
-            chromeFrame = frame
-        case .failure(let error):
-            let captureFailMsg = chromeCaptureUsedFallback
-                ? "Token retry exhausted and fallback failed: \(error.message)"
-                : "Chrome frame unavailable: \(error.message)"
-            logEvent("capture_position.chrome_read_failed", level: .warn,
-                     message: captureFailMsg,
-                     context: ["project_id": projectId, "attempts": "\(chromeCaptureAttempts)"])
+        } else {
             chromeFrame = nil
         }
 
-        // Skip save when Chrome frame is unavailable — preserve previous complete capture as canonical
-        guard let resolvedChromeFrame = chromeFrame else {
+        // When Chrome is enabled, preserve the previous complete capture if its frame
+        // is temporarily unavailable. Chrome-disabled projects intentionally save IDE-only.
+        if project.openChrome, chromeFrame == nil {
             logEvent("capture_position.skipped_partial", level: .warn,
                      message: "Skipping layout save — Chrome frame unavailable, preserving previous saved layout",
                      context: ["project_id": projectId])
@@ -95,10 +100,9 @@ extension ProjectManager {
             screenMode = .wide
         }
 
-        // Save complete frames (both IDE and Chrome available)
         let frames = SavedWindowFrames(
             ide: SavedFrame(rect: ideFrame),
-            chrome: SavedFrame(rect: resolvedChromeFrame)
+            chrome: chromeFrame.map(SavedFrame.init(rect:))
         )
         switch store.save(projectId: projectId, mode: screenMode, frames: frames) {
         case .success:

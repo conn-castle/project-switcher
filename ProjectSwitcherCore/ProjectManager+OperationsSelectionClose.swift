@@ -8,23 +8,23 @@ extension ProjectManager {
     /// Runs the full activation sequence matching the proven shell-script order exactly:
     /// 1. Look up project in config
     /// 2. Store pre-captured focus (for later exit)
-    /// 3. Find or launch Chrome (do NOT move yet)
+    /// 3. Optionally find or launch Chrome (do NOT move yet)
     /// 4. Find or launch VS Code (do NOT move yet)
     /// 5. Move Chrome to workspace (no focus follow)
     /// 6. Move VS Code to workspace (with focus follow)
-    /// 7. Verify both windows arrived in workspace
+    /// 7. Verify the IDE arrived; report Chrome arrival failures as non-fatal warnings
     /// 8. Focus workspace (poll until confirmed)
     /// 9. Focus IDE window + verify stability
     ///
-    /// The order is critical: both windows must exist before any moves happen.
-    /// Moving Chrome before VS Code is launched can cause VS Code to open on
+    /// When Chrome is enabled and available, both windows are found or launched
+    /// before any moves happen. Moving Chrome before VS Code is launched can cause VS Code to open on
     /// a different macOS Space.
     ///
     /// - Parameters:
     ///   - projectId: The project ID to activate.
     ///   - preCapturedFocus: Focus state captured before showing UI, used for restoring
     ///     focus when exiting the project later.
-    /// - Returns: Activation success (IDE window ID + optional tab restore warning) or error.
+    /// - Returns: Activation success (IDE window ID + optional Chrome warning) or error.
     public func selectProject(projectId: String, preCapturedFocus: CapturedFocus) async -> Result<ProjectActivationSuccess, ProjectError> {
         await selectProject(projectId: projectId, preCapturedFocus: preCapturedFocus as CapturedFocus?)
     }
@@ -39,7 +39,7 @@ extension ProjectManager {
     /// - Parameters:
     ///   - projectId: The project ID to activate.
     ///   - preCapturedFocus: Focus state captured before showing UI, or nil if capture failed.
-    /// - Returns: Activation success (IDE window ID + optional tab restore warning) or error.
+    /// - Returns: Activation success (IDE window ID + optional Chrome warning) or error.
     public func selectProject(projectId: String, preCapturedFocus: CapturedFocus?) async -> Result<ProjectActivationSuccess, ProjectError> {
         let configSnapshot = withState { config }
         guard let configSnapshot else {
@@ -80,12 +80,16 @@ extension ProjectManager {
 
         // --- Phase 1: Find or launch all windows (no moves yet) ---
 
-        let chromeWindow: PsWindow
+        var chromeWindow: PsWindow?
         var chromeFreshlyLaunched = false
-        var tabRestoreWarning: String?
+        var chromeWarnings: [String] = []
 
-        // Check for existing Chrome window first (avoids resolving URLs when not needed)
-        if let existingWindow = findWindowByToken(appBundleId: PsChromeLauncher.bundleId, projectId: projectId) {
+        // Check for an existing Chrome window first (avoids resolving URLs when not needed).
+        // Chrome is optional per project, and every Chrome failure is non-fatal so IDE
+        // activation remains available when Chrome or its Automation permission is broken.
+        if !project.openChrome {
+            logEvent("select.chrome_skipped", context: ["project_id": projectId])
+        } else if let existingWindow = findWindowByToken(appBundleId: PsChromeLauncher.bundleId, projectId: projectId) {
             logEvent(Self.activationWindowEventName(source: "chrome", action: "found"), context: ["window_id": "\(existingWindow.windowId)"])
             chromeWindow = existingWindow
         } else {
@@ -100,8 +104,10 @@ extension ProjectManager {
                 eventSource: "chrome"
             ) {
             case .failure(let error):
-                // If launch-with-tabs failed and we had tabs, retry without tabs
-                if !chromeInitialURLs.isEmpty {
+                // Retry without tabs only when the launch command itself failed. A successful
+                // launch followed by a discovery timeout may already have created a Chrome
+                // window; launching again would create an untracked duplicate.
+                if !chromeInitialURLs.isEmpty, case .chromeLaunchFailed = error {
                     logEvent("select.chrome_tab_launch_failed", level: .warn, message: "\(error)")
                     switch await findOrLaunchWindow(
                         appBundleId: PsChromeLauncher.bundleId,
@@ -111,14 +117,20 @@ extension ProjectManager {
                         eventSource: "chrome"
                     ) {
                     case .failure(let fallbackError):
-                        return .failure(fallbackError)
+                        chromeWarnings.append("Chrome unavailable: \(fallbackError.userFacingMessage)")
+                        logEvent("select.chrome_optional_failed", level: .warn,
+                                 message: fallbackError.userFacingMessage,
+                                 context: ["project_id": projectId])
                     case .success(let outcome):
                         chromeWindow = outcome.window
                         chromeFreshlyLaunched = outcome.wasLaunched
-                        tabRestoreWarning = "Chrome launched without tabs (tab restore failed)"
+                        chromeWarnings.append("Chrome launched without tabs (tab restore failed)")
                     }
                 } else {
-                    return .failure(error)
+                    chromeWarnings.append("Chrome unavailable: \(error.userFacingMessage)")
+                    logEvent("select.chrome_optional_failed", level: .warn,
+                             message: error.userFacingMessage,
+                             context: ["project_id": projectId])
                 }
             case .success(let outcome):
                 chromeWindow = outcome.window
@@ -150,17 +162,23 @@ extension ProjectManager {
 
         // --- Phase 2: Move windows to workspace (Chrome first, then VS Code) ---
 
-        let chromeWindowId = chromeWindow.windowId
         let ideWindowId = ideWindow.windowId
+        var chromeWindowIdForVerification: Int?
 
-        if chromeWindow.workspace != targetWorkspace {
+        if let chromeWindow, chromeWindow.workspace != targetWorkspace {
+            let chromeWindowId = chromeWindow.windowId
             logEvent("select.chrome_moving", context: ["window_id": "\(chromeWindowId)", "workspace": targetWorkspace])
             switch aerospace.moveWindowToWorkspace(workspace: targetWorkspace, windowId: chromeWindowId, focusFollows: false) {
             case .failure(let error):
-                return .failure(.aeroSpaceError(detail: error.message))
+                chromeWarnings.append("Chrome window could not be moved: \(error.message)")
+                logEvent("select.chrome_move_failed", level: .warn, message: error.message,
+                         context: ["project_id": projectId, "window_id": "\(chromeWindowId)"])
             case .success:
                 logEvent("select.chrome_moved", context: ["workspace": targetWorkspace])
+                chromeWindowIdForVerification = chromeWindowId
             }
+        } else if let chromeWindow {
+            chromeWindowIdForVerification = chromeWindow.windowId
         }
 
         if ideWindow.workspace != targetWorkspace {
@@ -175,19 +193,27 @@ extension ProjectManager {
 
         // --- Phase 3: Verify, focus workspace, focus IDE ---
 
+        let chromeArrived: Bool
         switch await pollForWindowsInWorkspace(
-            chromeWindowId: chromeWindowId,
+            chromeWindowId: chromeWindowIdForVerification,
             ideWindowId: ideWindowId,
             workspace: targetWorkspace
         ) {
         case .failure(let error):
             return .failure(error)
-        case .success:
-            break
+        case .success(let didChromeArrive):
+            chromeArrived = didChromeArrive
+        }
+        if chromeWindowIdForVerification != nil, !chromeArrived {
+            chromeWarnings.append("Chrome window did not arrive in workspace \(targetWorkspace)")
+            logEvent("select.chrome_arrival_failed", level: .warn,
+                     context: ["project_id": projectId, "workspace": targetWorkspace])
         }
 
         // Ensure moved project windows are removed from non-project focus history.
-        invalidateFocusHistory(windowId: chromeWindowId, reason: "moved_to_project")
+        if let chromeWindowIdForVerification, chromeArrived {
+            invalidateFocusHistory(windowId: chromeWindowIdForVerification, reason: "moved_to_project")
+        }
         invalidateFocusHistory(windowId: ideWindowId, reason: "moved_to_project")
 
         if !(await ensureWorkspaceFocused(name: targetWorkspace)) {
@@ -208,7 +234,10 @@ extension ProjectManager {
         }
 
         // Position windows (non-fatal)
-        let layoutWarning = await positionWindows(projectId: projectId)
+        let layoutWarning = await positionWindows(
+            projectId: projectId,
+            includeChrome: chromeWindowIdForVerification != nil && chromeArrived
+        )
 
         // Store pre-entry focus for close-project restoration now that activation
         // succeeded. Stored here (not earlier) so failure paths never leave stale entries.
@@ -229,7 +258,7 @@ extension ProjectManager {
 
         return .success(ProjectActivationSuccess(
             ideWindowId: ideWindowId,
-            tabRestoreWarning: tabRestoreWarning,
+            chromeWarning: chromeWarnings.isEmpty ? nil : chromeWarnings.joined(separator: "; "),
             layoutWarning: layoutWarning
         ))
     }
@@ -241,12 +270,12 @@ extension ProjectManager {
             return .failure(.configNotLoaded)
         }
 
-        guard configSnapshot.projects.contains(where: { $0.id == projectId }) else {
+        guard let project = configSnapshot.projects.first(where: { $0.id == projectId }) else {
             return .failure(.projectNotFound(projectId: projectId))
         }
 
         // Capture Chrome tabs before closing (non-fatal)
-        let tabCaptureWarning = performTabCapture(projectId: projectId)
+        let tabCaptureWarning = project.openChrome ? performTabCapture(projectId: projectId) : nil
 
         // Capture window positions before closing (non-fatal)
         await captureWindowPositions(projectId: projectId)

@@ -221,8 +221,8 @@ Each project window is tagged with `PS:<project-id>` in the window title. Chrome
 Search **all monitors** first. If that fails (older AeroSpace builds), fall back to `--monitor focused`:
 
 ```sh
-# Preferred: global search
-aerospace list-windows --app-bundle-id <bundle-id> --format <format>
+# Preferred: global search (AeroSpace requires an explicit scope)
+aerospace list-windows --monitor all --app-bundle-id <bundle-id> --format <format>
 
 # Fallback: focused monitor only
 aerospace list-windows --monitor focused --app-bundle-id <bundle-id> --format <format>
@@ -232,20 +232,20 @@ This is the one exception to the "prefer scoped queries" guidance above — tagg
 
 ### Chrome launch (AppleScript)
 
-If no tagged Chrome window exists, resolve initial tab URLs and launch via `osascript`. Tab URLs come from the last captured snapshot (verbatim, preserving order). If no snapshot exists (cold start), URLs are computed from always-open URLs (global `pinnedTabs` + per-project `chromePinnedTabs` + git remote if enabled) followed by default tabs. URL resolution is deferred until after confirming Chrome needs a fresh launch.
+When a project has `openChrome = true` (the default) and no tagged Chrome window exists, ProjectSwitcher resolves initial tab URLs and launches one via `osascript`. Chrome setup is best-effort: lookup, launch, movement, or arrival failures are logged as warnings and do not block VS Code activation. Set `openChrome = false` on a project to skip all Chrome activation, positioning, and close-time capture work. Tab URLs come from the last captured snapshot (verbatim, preserving order). If no snapshot exists (cold start), URLs are computed from always-open URLs (global `pinnedTabs` + per-project `chromePinnedTabs` + git remote if enabled) followed by default tabs. URL resolution is deferred until after confirming Chrome needs a fresh launch.
 
 Launch with tab URLs (single AppleScript, no placeholder):
 
 ```applescript
 tell application "Google Chrome"
   set newWindow to make new window
-  set URL of active tab of newWindow to "<first-tab-url>"
   set given name of newWindow to "PS:<project-id>"
+  set URL of active tab of newWindow to "<first-tab-url>"
   -- additional tabs opened via `make new tab` with each URL
 end tell
 ```
 
-If the tab-restore launch fails, Chrome falls back to launching without tabs (empty window with tag only) and a warning is surfaced to the caller.
+If the AppleScript launch command fails while restoring tabs, Chrome falls back to launching without tabs (empty window with tag only) and a warning is surfaced to the caller. A successful launch whose token is not yet visible is not repeated, because that would create a duplicate window.
 
 ### VS Code launch (settings.json block)
 
@@ -272,7 +272,7 @@ If no tagged VS Code window exists:
 
 ### Poll until window appears
 
-After launch, poll `list-windows` (using the global-with-fallback pattern) until a window matching the token appears, with a 10-second timeout and 100ms interval.
+After launch, poll `list-windows` (using the global-with-fallback pattern) until a window matching the token appears, with a 10-second timeout and 100ms interval. For Chrome, ProjectSwitcher snapshots the pre-launch window IDs and also accepts exactly one newly appeared window while the AppleScript title is still propagating; it never adopts an older untagged window through this fallback.
 
 ## Step 2: Move windows to workspace (sequential)
 

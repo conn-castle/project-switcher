@@ -77,6 +77,21 @@ final class ChromeLauncherTests: XCTestCase {
         let titleLine = args.first { $0.contains("set given name of newWindow") }
         XCTAssertNotNil(titleLine)
         XCTAssertTrue(titleLine!.contains("PS:my-proj"))
+        let scriptLines = args.enumerated().compactMap { index, value in
+            index.isMultiple(of: 2) ? nil : value
+        }
+        XCTAssertLessThan(
+            scriptLines.firstIndex(where: { $0.contains("set given name of newWindow") })!,
+            scriptLines.firstIndex(where: { $0.contains("set URL of active tab") })!,
+            "The window must be tagged before URL operations that can fail after creating it"
+        )
+    }
+
+    func testProjectTokenMatchingRejectsLongerProjectIdPrefix() {
+        XCTAssertTrue(PsIdeToken.matches(windowTitle: "PS:sample-project - Chrome", projectId: "sample-project"))
+        XCTAssertTrue(PsIdeToken.matches(windowTitle: "  PS:sample-project", projectId: "sample-project"))
+        XCTAssertFalse(PsIdeToken.matches(windowTitle: "PS:sample-project-original - Chrome", projectId: "sample-project"))
+        XCTAssertFalse(PsIdeToken.matches(windowTitle: "Notes PS:sample-project - Chrome", projectId: "sample-project"))
     }
 
     func testOpenNewWindowNonZeroExitReturnsFailureWithStderr() {

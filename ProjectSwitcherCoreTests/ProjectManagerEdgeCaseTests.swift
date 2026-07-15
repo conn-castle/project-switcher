@@ -49,7 +49,7 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
 
     // MARK: - selectProject: Chrome move fails
 
-    func testSelectProjectFailsWhenChromeMoveToWorkspaceFails() async {
+    func testSelectProjectContinuesWhenChromeMoveToWorkspaceFails() async {
         let projectId = "proj"
         let aero = EdgeAeroSpaceStub()
 
@@ -60,6 +60,11 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
 
         aero.windowsByBundleId["com.google.Chrome"] = [chromeWindow]
         aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
+        aero.windowsByWorkspace["ps-\(projectId)"] = [ideWindow]
+        aero.focusedWindowResult = .success(ideWindow)
+        aero.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: "ps-\(projectId)", isFocused: true)
+        ])
         aero.moveFailWindowIds = [100]
 
         let manager = makeManager(aerospace: aero)
@@ -68,10 +73,10 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         let preFocus = CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
         let result = await manager.selectProject(projectId: projectId, preCapturedFocus: preFocus)
 
-        if case .success = result { XCTFail("Expected failure from Chrome move") }
-        if case .failure(let error) = result {
-            XCTAssertEqual(error, .aeroSpaceError(detail: "move failed"))
+        guard case .success(let success) = result else {
+            return XCTFail("Expected IDE activation to survive Chrome move failure, got \(result)")
         }
+        XCTAssertEqual(success.chromeWarning, "Chrome window could not be moved: move failed")
     }
 
     // MARK: - selectProject: IDE move fails
@@ -222,9 +227,42 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         }
     }
 
+    /// A daemon recovery can outlast the nominal focus timeout. The recovered
+    /// daemon must receive another focus attempt instead of failing immediately.
+    func testEnsureWorkspaceFocusedRetriesAfterFirstAttemptConsumesDeadline() async {
+        let workspace = "ps-proj"
+        let aero = EdgeAeroSpaceStub()
+        let focusedWindow = PsWindow(
+            windowId: 101,
+            appBundleId: "com.microsoft.VSCode",
+            workspace: workspace,
+            windowTitle: "PS:proj - VS Code"
+        )
+        aero.focusedWindowResult = .success(focusedWindow)
+        aero.workspacesWithFocusResults = [
+            .success([PsWorkspaceSummary(workspace: workspace, isFocused: false)]),
+            .success([PsWorkspaceSummary(workspace: workspace, isFocused: true)])
+        ]
+        aero.onFocusWorkspace = {
+            if aero.focusedWorkspaces.count == 1 {
+                Thread.sleep(forTimeInterval: 0.03)
+            }
+        }
+
+        let manager = makeManager(
+            aerospace: aero,
+            windowPollTimeout: 0.01,
+            windowPollInterval: 0.001
+        )
+
+        let focused = await manager.ensureWorkspaceFocused(name: workspace)
+        XCTAssertTrue(focused)
+        XCTAssertEqual(aero.focusedWorkspaces, [workspace, workspace])
+    }
+
     // MARK: - selectProject: Chrome launch fails with empty URLs (no retry)
 
-    func testSelectProjectFailsWhenChromeLaunchFailsWithNoURLs() async {
+    func testSelectProjectContinuesWhenChromeLaunchFailsWithNoURLs() async {
         let projectId = "proj"
         let aero = EdgeAeroSpaceStub()
         // No existing Chrome window — needs launch
@@ -232,6 +270,11 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         let ideWindow = PsWindow(windowId: 101, appBundleId: "com.microsoft.VSCode",
                                  workspace: "ps-\(projectId)", windowTitle: "PS:\(projectId) - VS Code")
         aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
+        aero.windowsByWorkspace["ps-\(projectId)"] = [ideWindow]
+        aero.focusedWindowResult = .success(ideWindow)
+        aero.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: "ps-\(projectId)", isFocused: true)
+        ])
 
         let failingChrome = EdgeChromeLauncherFailingStub()
         failingChrome.alwaysFail = true
@@ -243,25 +286,26 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         let preFocus = CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
         let result = await manager.selectProject(projectId: projectId, preCapturedFocus: preFocus)
 
-        if case .success = result { XCTFail("Expected Chrome launch failure") }
-        if case .failure(let error) = result {
-            if case .chromeLaunchFailed = error {
-                // expected
-            } else {
-                XCTFail("Expected chromeLaunchFailed, got: \(error)")
-            }
+        guard case .success(let success) = result else {
+            return XCTFail("Expected IDE activation to survive Chrome launch failure, got \(result)")
         }
+        XCTAssertTrue(success.chromeWarning?.contains("Chrome launch failed") == true)
     }
 
     // MARK: - selectProject: Chrome retry also fails
 
-    func testSelectProjectFailsWhenChromeFallbackRetryAlsoFails() async {
+    func testSelectProjectContinuesWhenChromeFallbackRetryAlsoFails() async {
         let projectId = "proj"
         let aero = EdgeAeroSpaceStub()
         aero.windowsByBundleId["com.google.Chrome"] = []
         let ideWindow = PsWindow(windowId: 101, appBundleId: "com.microsoft.VSCode",
                                  workspace: "ps-\(projectId)", windowTitle: "PS:\(projectId) - VS Code")
         aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
+        aero.windowsByWorkspace["ps-\(projectId)"] = [ideWindow]
+        aero.focusedWindowResult = .success(ideWindow)
+        aero.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: "ps-\(projectId)", isFocused: true)
+        ])
 
         let failingChrome = EdgeChromeLauncherFailingStub()
         failingChrome.alwaysFail = true
@@ -274,14 +318,97 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
         let preFocus = CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
         let result = await manager.selectProject(projectId: projectId, preCapturedFocus: preFocus)
 
-        if case .success = result { XCTFail("Expected Chrome fallback launch failure") }
-        if case .failure(let error) = result {
-            if case .chromeLaunchFailed = error {
-                // expected
-            } else {
-                XCTFail("Expected chromeLaunchFailed, got: \(error)")
-            }
+        guard case .success(let success) = result else {
+            return XCTFail("Expected IDE activation to survive Chrome fallback failure, got \(result)")
         }
+        XCTAssertTrue(success.chromeWarning?.contains("Chrome launch failed") == true)
+    }
+
+    func testSelectProjectDoesNotRelaunchChromeAfterDiscoveryTimeout() async {
+        let projectId = "proj"
+        let aero = EdgeAeroSpaceStub()
+        aero.windowsByBundleId["com.google.Chrome"] = []
+        let ideWindow = PsWindow(windowId: 101, appBundleId: "com.microsoft.VSCode",
+                                 workspace: "ps-\(projectId)", windowTitle: "PS:\(projectId) - VS Code")
+        aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
+        aero.windowsByWorkspace["ps-\(projectId)"] = [ideWindow]
+        aero.focusedWindowResult = .success(ideWindow)
+        aero.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: "ps-\(projectId)", isFocused: true)
+        ])
+
+        let recordingChrome = EdgeRecordingChromeLauncher()
+        let manager = makeManager(
+            aerospace: aero,
+            chromeLauncher: recordingChrome,
+            windowPollTimeout: 0.001,
+            windowPollInterval: 0.001
+        )
+        loadConfig(
+            manager,
+            projectId: projectId,
+            chrome: ChromeConfig(defaultTabs: ["https://example.com"])
+        )
+
+        let preFocus = CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
+        let result = await manager.selectProject(projectId: projectId, preCapturedFocus: preFocus)
+
+        guard case .success(let success) = result else {
+            return XCTFail("Expected IDE activation after Chrome discovery timeout, got \(result)")
+        }
+        XCTAssertTrue(success.chromeWarning?.contains("did not appear") == true)
+        XCTAssertEqual(recordingChrome.calls.count, 1, "A successful launch must not be repeated after discovery times out")
+        XCTAssertEqual(recordingChrome.calls[0].urls, ["https://example.com"])
+    }
+
+    func testSelectProjectAcceptsSingleChromeWindowCreatedByLaunchBeforeTitleRefresh() async {
+        let projectId = "proj"
+        let workspace = "ps-\(projectId)"
+        let aero = EdgeAeroSpaceStub()
+        aero.windowsByBundleId["com.google.Chrome"] = [
+            PsWindow(windowId: 50, appBundleId: "com.google.Chrome", workspace: "main", windowTitle: "Existing Chrome")
+        ]
+
+        let launchedChrome = PsWindow(
+            windowId: 100,
+            appBundleId: "com.google.Chrome",
+            workspace: workspace,
+            windowTitle: "Loading..."
+        )
+        let ideWindow = PsWindow(
+            windowId: 101,
+            appBundleId: "com.microsoft.VSCode",
+            workspace: workspace,
+            windowTitle: "PS:\(projectId) - VS Code"
+        )
+        aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
+        aero.windowsByWorkspace[workspace] = [launchedChrome, ideWindow]
+        aero.focusedWindowResult = .success(ideWindow)
+        aero.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: workspace, isFocused: true)
+        ])
+
+        let recordingChrome = EdgeRecordingChromeLauncher()
+        recordingChrome.onLaunch = {
+            aero.windowsByBundleId["com.google.Chrome"]?.append(launchedChrome)
+        }
+        let manager = makeManager(
+            aerospace: aero,
+            chromeLauncher: recordingChrome,
+            windowPollTimeout: 0.01,
+            windowPollInterval: 0.001
+        )
+        loadConfig(manager, projectId: projectId)
+
+        let result = await manager.selectProject(
+            projectId: projectId,
+            preCapturedFocus: CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
+        )
+
+        if case .failure(let error) = result {
+            XCTFail("Expected the newly created Chrome window to be accepted: \(error)")
+        }
+        XCTAssertEqual(recordingChrome.calls.count, 1)
     }
 
     // MARK: - captureCurrentFocus: AeroSpace failure
@@ -724,39 +851,61 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
 
     // MARK: - findWindowByToken: listWindowsForApp fails
 
-    func testSelectProjectLaunchesWindowWhenListWindowsFails() async {
+    func testSelectProjectDoesNotLaunchChromeWhenInventoryFails() async {
         let projectId = "proj"
-        let workspace = "ps-\(projectId)"
         let aero = EdgeAeroSpaceStub()
         aero.listWindowsForAppFailBundleIds = ["com.google.Chrome"]
-
-        let chromeWindow = PsWindow(windowId: 100, appBundleId: "com.google.Chrome",
-                                    workspace: workspace, windowTitle: "PS:\(projectId) - Chrome")
         let ideWindow = PsWindow(windowId: 101, appBundleId: "com.microsoft.VSCode",
-                                 workspace: workspace, windowTitle: "PS:\(projectId) - VS Code")
+                                 workspace: "ps-\(projectId)", windowTitle: "PS:\(projectId) - VS Code")
         aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
-        aero.windowsByWorkspace[workspace] = [chromeWindow, ideWindow]
-        aero.focusWindowResult = .success(())
+        aero.windowsByWorkspace["ps-\(projectId)"] = [ideWindow]
         aero.focusedWindowResult = .success(ideWindow)
         aero.workspacesWithFocusResult = .success([
-            PsWorkspaceSummary(workspace: workspace, isFocused: true)
+            PsWorkspaceSummary(workspace: "ps-\(projectId)", isFocused: true)
         ])
 
         let recordingChrome = EdgeRecordingChromeLauncher()
-        recordingChrome.onLaunch = {
-            // Remove failure and add window on second call
-            aero.listWindowsForAppFailBundleIds.remove("com.google.Chrome")
-            aero.windowsByBundleId["com.google.Chrome"] = [chromeWindow]
-        }
-
         let manager = makeManager(aerospace: aero, chromeLauncher: recordingChrome)
         loadConfig(manager, projectId: projectId)
 
         let preFocus = CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
         let result = await manager.selectProject(projectId: projectId, preCapturedFocus: preFocus)
 
-        if case .failure(let error) = result { XCTFail("Expected success: \(error)") }
-        XCTAssertEqual(recordingChrome.calls.count, 1, "Chrome should have been launched")
+        guard case .success(let success) = result else {
+            return XCTFail("Expected IDE activation to survive Chrome inventory failure, got \(result)")
+        }
+        XCTAssertTrue(success.chromeWarning?.contains("list failed") == true)
+        XCTAssertTrue(recordingChrome.calls.isEmpty, "Chrome must not launch when absence cannot be established")
+    }
+
+    func testSelectProjectSkipsAllChromeWorkWhenDisabled() async {
+        let projectId = "proj"
+        let workspace = "ps-\(projectId)"
+        let aero = EdgeAeroSpaceStub()
+        aero.listWindowsForAppFailBundleIds = ["com.google.Chrome"]
+        let ideWindow = PsWindow(windowId: 101, appBundleId: "com.microsoft.VSCode",
+                                 workspace: workspace, windowTitle: "PS:\(projectId) - VS Code")
+        aero.windowsByBundleId["com.microsoft.VSCode"] = [ideWindow]
+        aero.windowsByWorkspace[workspace] = [ideWindow]
+        aero.focusedWindowResult = .success(ideWindow)
+        aero.workspacesWithFocusResult = .success([
+            PsWorkspaceSummary(workspace: workspace, isFocused: true)
+        ])
+        let recordingChrome = EdgeRecordingChromeLauncher()
+        let manager = makeManager(aerospace: aero, chromeLauncher: recordingChrome)
+        loadConfig(manager, projectId: projectId, openChrome: false)
+
+        let result = await manager.selectProject(
+            projectId: projectId,
+            preCapturedFocus: CapturedFocus(windowId: 1, appBundleId: "other", workspace: "main")
+        )
+
+        guard case .success(let success) = result else {
+            return XCTFail("Expected Chrome-disabled activation to succeed, got \(result)")
+        }
+        XCTAssertNil(success.chromeWarning)
+        XCTAssertTrue(recordingChrome.calls.isEmpty)
+        XCTAssertFalse(aero.listWindowBundleIds.contains("com.google.Chrome"))
     }
 
     // MARK: - Helpers
@@ -796,10 +945,11 @@ final class ProjectManagerEdgeCaseTests: XCTestCase {
     }
 
     private func loadConfig(_ manager: ProjectManager, projectId: String,
-                            chrome: ChromeConfig = ChromeConfig()) {
+                            chrome: ChromeConfig = ChromeConfig(), openChrome: Bool = true) {
         manager.loadTestConfig(Config(
             projects: [ProjectConfig(id: projectId, name: projectId.capitalized,
-                                     path: "/tmp/\(projectId)", color: "blue", useAgentLayer: false)],
+                                     path: "/tmp/\(projectId)", color: "blue", useAgentLayer: false,
+                                     openChrome: openChrome)],
             chrome: chrome
         ))
     }
@@ -815,6 +965,8 @@ private final class EdgeAeroSpaceStub: AeroSpaceProviding {
     private var focusedWindowCallCount = 0
     var focusWindowResult: Result<Void, PsCoreError> = .success(())
     var workspacesWithFocusResult: Result<[PsWorkspaceSummary], PsCoreError> = .success([])
+    var workspacesWithFocusResults: [Result<[PsWorkspaceSummary], PsCoreError>] = []
+    var onFocusWorkspace: (() -> Void)?
     var focusWorkspaceResult: Result<Void, PsCoreError> = .success(())
     var closeWorkspaceResult: Result<Void, PsCoreError> = .success(())
     var windowsByBundleId: [String: [PsWindow]] = [:]
@@ -824,15 +976,22 @@ private final class EdgeAeroSpaceStub: AeroSpaceProviding {
     private(set) var movedWindows: [(windowId: Int, workspace: String)] = []
     private(set) var focusedWindowIds: [Int] = []
     private(set) var focusedWorkspaces: [String] = []
+    private(set) var listWindowBundleIds: [String] = []
 
     func getWorkspaces() -> Result<[String], PsCoreError> { .success([]) }
     func workspaceExists(_ name: String) -> Result<Bool, PsCoreError> { .success(false) }
     func listWorkspacesFocused() -> Result<[String], PsCoreError> { .success([]) }
-    func listWorkspacesWithFocus() -> Result<[PsWorkspaceSummary], PsCoreError> { workspacesWithFocusResult }
+    func listWorkspacesWithFocus() -> Result<[PsWorkspaceSummary], PsCoreError> {
+        if !workspacesWithFocusResults.isEmpty {
+            return workspacesWithFocusResults.removeFirst()
+        }
+        return workspacesWithFocusResult
+    }
     func createWorkspace(_ name: String) -> Result<Void, PsCoreError> { .success(()) }
     func closeWorkspace(name: String) -> Result<Void, PsCoreError> { closeWorkspaceResult }
 
     func listWindowsForApp(bundleId: String) -> Result<[PsWindow], PsCoreError> {
+        listWindowBundleIds.append(bundleId)
         if listWindowsForAppFailBundleIds.contains(bundleId) {
             return .failure(PsCoreError(message: "list failed"))
         }
@@ -879,6 +1038,7 @@ private final class EdgeAeroSpaceStub: AeroSpaceProviding {
 
     func focusWorkspace(name: String) -> Result<Void, PsCoreError> {
         focusedWorkspaces.append(name)
+        onFocusWorkspace?()
         return focusWorkspaceResult
     }
 }

@@ -617,7 +617,6 @@ public final class WindowRecoveryManager {
 
         let cascadeOffsetPoints = CGFloat(0.5 * (Double(screenVisibleFrame.width) / physicalWidth))
 
-        let token = "\(PsIdeToken.prefix)\(projectId)"
         let recoveryRetryInterval: TimeInterval = 0.1
         let maxRecoveryRetries = 3
         var recovered = 0
@@ -625,7 +624,8 @@ public final class WindowRecoveryManager {
 
         for target in layoutTargets {
             let tokenMatchingWindows = workspaceWindows.filter {
-                $0.appBundleId == target.bundleId && $0.windowTitle.contains(token)
+                $0.appBundleId == target.bundleId
+                    && PsIdeToken.matches(windowTitle: $0.windowTitle, projectId: projectId)
             }
             let allBundleWindows = workspaceWindows.filter { $0.appBundleId == target.bundleId }
             let fallbackAnchorWindow: PsWindow? = {

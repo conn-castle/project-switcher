@@ -17,6 +17,7 @@ extension SwitcherPanelController: NSWindowDelegate {
             isActivating: operationCoordinator.isActivating,
             isVisible: true,
             isExternalFocusTransitionInProgress: operationCoordinator.isExitingToNonProject
+                || operationCoordinator.isClosingProject
         )
         switch decision {
         case .dismiss:

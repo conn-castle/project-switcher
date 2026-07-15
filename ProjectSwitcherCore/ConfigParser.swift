@@ -75,7 +75,7 @@ struct ConfigParser {
 
     /// Known keys in each [[project]] entry.
     static let knownProjectKeys: Set<String> = [
-        "name", "remote", "path", "color", "useAgentLayer", "chromePinnedTabs", "chromeDefaultTabs"
+        "name", "remote", "path", "color", "useAgentLayer", "openChrome", "chromePinnedTabs", "chromeDefaultTabs"
     ]
 
     /// Checks for unrecognized keys in a TOMLTable and emits FAIL findings for each.

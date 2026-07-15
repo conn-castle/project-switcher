@@ -8,7 +8,7 @@ final class AeroSpaceCompatibilityTests: XCTestCase {
         let runner = FallbackMockCommandRunner()
         // Use keyed results: concurrent execution means FIFO order is non-deterministic
         runner.keyedResults = [
-            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused", stderr: "")),
+            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused --format", stderr: "")),
             "list-windows": .success(PsCommandResult(exitCode: 0, stdout: "--monitor --workspace --focused --app-bundle-id --format", stderr: "")),
             "summon-workspace": .success(PsCommandResult(exitCode: 0, stdout: "ok", stderr: "")),
             "move-node-to-workspace": .success(PsCommandResult(exitCode: 0, stdout: "--window-id", stderr: "")),
@@ -26,7 +26,7 @@ final class AeroSpaceCompatibilityTests: XCTestCase {
     func testCheckCompatibilityAcceptsFlagsFromStdoutAndStderr() {
         let runner = FallbackMockCommandRunner()
         runner.keyedResults = [
-            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "--all --focused")),
+            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "--all --focused --format")),
             "list-windows": .success(PsCommandResult(exitCode: 0, stdout: "--monitor", stderr: "--workspace --focused --app-bundle-id --format")),
             "summon-workspace": .success(PsCommandResult(exitCode: 0, stdout: "ok", stderr: "")),
             "move-node-to-workspace": .success(PsCommandResult(exitCode: 0, stdout: "--window-id", stderr: "")),
@@ -68,7 +68,7 @@ final class AeroSpaceCompatibilityTests: XCTestCase {
     func testCheckCompatibilityFailsWhenHelpCommandRunnerFails() {
         let runner = FallbackMockCommandRunner()
         runner.keyedResults = [
-            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused", stderr: "")),
+            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused --format", stderr: "")),
             "list-windows": .success(PsCommandResult(exitCode: 0, stdout: "--monitor --workspace --focused --app-bundle-id --format", stderr: "")),
             "summon-workspace": .success(PsCommandResult(exitCode: 0, stdout: "ok", stderr: "")),
             "move-node-to-workspace": .success(PsCommandResult(exitCode: 0, stdout: "--window-id", stderr: "")),
@@ -88,7 +88,7 @@ final class AeroSpaceCompatibilityTests: XCTestCase {
     func testCheckCompatibilityFailsWhenHelpCommandExitsNonZero() {
         let runner = FallbackMockCommandRunner()
         runner.keyedResults = [
-            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused", stderr: "")),
+            "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused --format", stderr: "")),
             "list-windows": .success(PsCommandResult(exitCode: 0, stdout: "--monitor --workspace --focused --app-bundle-id --format", stderr: "")),
             "summon-workspace": .success(PsCommandResult(exitCode: 0, stdout: "ok", stderr: "")),
             "move-node-to-workspace": .success(PsCommandResult(exitCode: 0, stdout: "--window-id", stderr: "")),
@@ -137,7 +137,7 @@ final class AeroSpaceCompatibilityTests: XCTestCase {
         for _ in 0..<10 {
             let runner = FallbackMockCommandRunner()
             runner.keyedResults = [
-                "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused", stderr: "")),
+                "list-workspaces": .success(PsCommandResult(exitCode: 0, stdout: "--all --focused --format", stderr: "")),
                 "list-windows": .success(PsCommandResult(exitCode: 0, stdout: "--monitor --workspace --focused --app-bundle-id --format", stderr: "")),
                 "summon-workspace": .success(PsCommandResult(exitCode: 0, stdout: "ok", stderr: "")),
                 "move-node-to-workspace": .success(PsCommandResult(exitCode: 0, stdout: "--window-id", stderr: "")),
@@ -159,4 +159,3 @@ final class AeroSpaceCompatibilityTests: XCTestCase {
         }
     }
 }
-

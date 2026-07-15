@@ -109,6 +109,13 @@ extension ConfigParser {
             label: "project[\(index)].useAgentLayer",
             findings: &findings
         )
+        let openChrome = readOptionalBool(
+            from: table,
+            key: "openChrome",
+            defaultValue: true,
+            label: "project[\(index)].openChrome",
+            findings: &findings
+        )
 
         // Name validation + id derivation
         var derivedId: String?
@@ -279,6 +286,7 @@ extension ConfigParser {
             path: path,
             color: normalizedColor,
             useAgentLayer: useAgentLayer,
+            openChrome: openChrome,
             chromePinnedTabs: chromePinnedTabs,
             chromeDefaultTabs: chromeDefaultTabs
         )

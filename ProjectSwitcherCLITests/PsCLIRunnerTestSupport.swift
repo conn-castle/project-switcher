@@ -57,7 +57,7 @@ final class MockProjectManager: ProjectManaging {
     var sortedProjectsResult: [ProjectConfig] = []
     var sortedProjectsQueries: [String] = []
     var captureCurrentFocusResult: CapturedFocus?
-    var selectProjectResult: Result<ProjectActivationSuccess, ProjectError> = .success(ProjectActivationSuccess(ideWindowId: 1, tabRestoreWarning: nil))
+    var selectProjectResult: Result<ProjectActivationSuccess, ProjectError> = .success(ProjectActivationSuccess(ideWindowId: 1, chromeWarning: nil))
     var selectProjectCalls: [(projectId: String, focus: CapturedFocus)] = []
     var closeProjectResult: Result<ProjectCloseSuccess, ProjectError> = .success(ProjectCloseSuccess(tabCaptureWarning: nil))
     var closeProjectCalls: [String] = []

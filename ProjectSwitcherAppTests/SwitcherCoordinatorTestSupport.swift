@@ -43,6 +43,7 @@ final class CoordinatorTestAeroSpaceStub: AeroSpaceProviding {
     var listWorkspacesWithFocusWaitSemaphore: DispatchSemaphore?
     var listWorkspacesWithFocusWaitTimeoutSeconds: TimeInterval = defaultListWorkspacesWithFocusWaitTimeoutSeconds
     var focusWorkspaceResult: Result<Void, PsCoreError> = .success(())
+    var closeWorkspaceWaitSemaphore: DispatchSemaphore?
     var windowsByBundleId: [String: [PsWindow]] = [:]
     var windowsByWorkspace: [String: [PsWindow]] = [:]
     var allWindows: [PsWindow] = []
@@ -67,7 +68,10 @@ final class CoordinatorTestAeroSpaceStub: AeroSpaceProviding {
         return workspacesWithFocusResult
     }
     func createWorkspace(_ name: String) -> Result<Void, PsCoreError> { .success(()) }
-    func closeWorkspace(name: String) -> Result<Void, PsCoreError> { .success(()) }
+    func closeWorkspace(name: String) -> Result<Void, PsCoreError> {
+        closeWorkspaceWaitSemaphore?.wait()
+        return .success(())
+    }
 
     func listWindowsForApp(bundleId: String) -> Result<[PsWindow], PsCoreError> {
         .success(windowsByBundleId[bundleId] ?? [])

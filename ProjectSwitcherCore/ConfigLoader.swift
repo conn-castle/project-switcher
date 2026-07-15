@@ -71,7 +71,7 @@ public struct ConfigFinding: Equatable, Sendable {
 
 /// Loads and parses the ProjectSwitcher configuration file.
 struct ConfigLoader {
-    static let starterConfigTemplate = """
+    private static let starterConfigTemplate = """
 # ProjectSwitcher configuration
 #
 # [app] (optional) — Application settings
@@ -99,6 +99,7 @@ struct ConfigLoader {
 # - path: Absolute path to the repo (local when remote is absent, remote path when remote is set)
 # - color: "#RRGGBB" or a named color (\(ProjectColorPalette.sortedNames.joined(separator: ", ")))
 # - useAgentLayer: (optional) override the global agentLayer.enabled default per project
+# - openChrome: (optional) find or launch a Chrome window for this project (default: true)
 # - chromePinnedTabs: (optional) per-project URLs always opened as leftmost tabs
 # - chromeDefaultTabs: (optional) per-project URLs opened when no tab history exists
 #
@@ -128,6 +129,7 @@ struct ConfigLoader {
 # path = "/Users/you/src/project-switcher"
 # color = "indigo"
 # useAgentLayer = false
+# openChrome = true
 # chromePinnedTabs = ["https://api.example.com"]
 # chromeDefaultTabs = ["https://jira.example.com"]
 #

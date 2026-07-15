@@ -132,10 +132,10 @@ final class AeroSpaceCircuitBreakerIntegrationTests: XCTestCase {
         breaker.recordTimeout()
         XCTAssertFalse(breaker.shouldAllow())
 
-        // Simulate start(): open -a AeroSpace succeeds, then isCliAvailable probe succeeds
+        // Simulate start(): open succeeds, then the daemon-backed probe succeeds.
         runner.results = [
             .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),  // open -a AeroSpace
-            .success(PsCommandResult(exitCode: 0, stdout: "", stderr: ""))   // aerospace --help (readiness)
+            .success(PsCommandResult(exitCode: 0, stdout: "main", stderr: ""))
         ]
         let aero = PsAeroSpace(
             commandRunner: runner,
@@ -168,7 +168,7 @@ final class AeroSpaceCircuitBreakerIntegrationTests: XCTestCase {
 
         runner.results = [
             .success(PsCommandResult(exitCode: 0, stdout: "", stderr: "")),
-            .failure(CircuitBreakerRecoveryTestValues.timeoutError(command: "aerospace --help"))
+            .failure(CircuitBreakerRecoveryTestValues.timeoutError(command: "aerospace list-workspaces --focused"))
         ]
         let aero = PsAeroSpace(
             commandRunner: runner,
@@ -201,7 +201,7 @@ final class AeroSpaceCircuitBreakerIntegrationTests: XCTestCase {
                 ),
                 CircuitBreakerMockCommandRunner.Call(
                     executable: "aerospace",
-                    arguments: ["--help"],
+                    arguments: ["list-workspaces", "--focused"],
                     timeoutSeconds: 2
                 )
             ],

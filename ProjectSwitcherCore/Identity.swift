@@ -7,7 +7,7 @@ public enum ProjectSwitcher {
 
     /// Build-time version constant. Must match MARKETING_VERSION in project.yml.
     /// CI preflight verifies these stay in sync.
-    static let buildVersion = "0.2.0"
+    static let buildVersion = "0.2.1"
 
     /// A human-readable app display name for user-facing guidance.
     ///

@@ -84,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private let logger: ProjectSwitcherLogging = ProjectSwitcherLogger()
     private let launchAtLoginToggler = LaunchAtLoginToggler()
+    private let launchAtLoginSynchronizer = LaunchAtLoginSynchronizer()
     private let appDisplayName = ProjectSwitcher.displayName
     private let isDevAppVariant = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
     private let projectManager = ProjectManager(
@@ -218,7 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .success(let recovery):
                 let workspaceType = WorkspaceRouting.isProjectWorkspace(focus.workspace) ? "project" : "non_project"
                 self.logAppEvent(
-                    event: "recover_agent_panel.completed",
+                    event: "recover_project_switcher.completed",
                     context: [
                         "workspace": focus.workspace,
                         "workspace_type": workspaceType,
@@ -228,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             case .failure(let error):
                 self.logAppEvent(
-                    event: "recover_agent_panel.failed",
+                    event: "recover_project_switcher.failed",
                     level: .error,
                     message: error.message
                 )
@@ -1074,30 +1075,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Syncs SMAppService registration with the config value.
     /// - Parameter configValue: The `autoStartAtLogin` value from config.
     private func syncLaunchAtLogin(configValue: Bool) {
-        let service = SMAppService.mainApp
-        if configValue {
-            do {
-                try service.register()
-                logAppEvent(event: "launch_at_login.registered")
-            } catch {
-                logAppEvent(
-                    event: "launch_at_login.register_failed",
-                    level: .warn,
-                    message: "Launch at login configured but registration failed: \(error.localizedDescription)"
-                )
-            }
-        } else {
-            guard service.status != .notRegistered else { return }
-            do {
-                try service.unregister()
-                logAppEvent(event: "launch_at_login.unregistered")
-            } catch {
-                logAppEvent(
-                    event: "launch_at_login.unregister_failed",
-                    level: .warn,
-                    message: "\(error.localizedDescription)"
-                )
-            }
+        for entry in launchAtLoginSynchronizer.sync(configValue: configValue) {
+            _ = logger.log(payload: entry)
         }
     }
 
@@ -1230,11 +1209,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Project workspaces receive layout-aware recovery (IDE/Chrome canonical frames).
     /// Non-project workspaces run generic window recovery for the current desktop.
     @objc private func recoverProjectSwitcher() {
-        logAppEvent(event: "recover_agent_panel.requested")
+        logAppEvent(event: "recover_project_switcher.requested")
         statusItem?.menu?.cancelTracking()
 
         guard let focus = menuWorkspaceCoordinator?.menuFocusCapture else {
-            logAppEvent(event: "recover_agent_panel.skipped", level: .warn, message: "No focused workspace available")
+            logAppEvent(event: "recover_project_switcher.skipped", level: .warn, message: "No focused workspace available")
             return
         }
 

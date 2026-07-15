@@ -317,9 +317,7 @@ final class DoctorCoverageTests: XCTestCase {
 
     // MARK: - Doctor.checkSSHSettingsBlock() uncovered branches
 
-    func testSSHSettingsBlockFailedGeneration() throws {
-        // This covers the fallback path when injectBlock fails (though it should never fail for "{}")
-        // We'll test the case where SSH command returns non-zero with empty stderr
+    func testSSHSettingsBlockNonzeroExitReportsUnavailableCheck() throws {
         let toml = """
         [[project]]
         name = "SSHFail"
@@ -343,11 +341,11 @@ final class DoctorCoverageTests: XCTestCase {
         let report = doctor.run()
 
         let finding = report.findings.first {
-            $0.severity == .warn && $0.title.contains("Remote .vscode/settings.json missing ProjectSwitcher block: sshfail")
+            $0.severity == .warn && $0.title.contains("Cannot check remote VS Code settings for sshfail")
         }
         XCTAssertNotNil(finding)
-        // When exit is non-zero and stderr is empty, detail should say "SSH command failed (exit 1)"
         XCTAssertTrue(finding?.bodyLines.contains(where: { $0.contains("SSH command failed (exit 1)") }) == true)
+        XCTAssertNil(finding?.snippet)
     }
 
     // MARK: - DoctorReport.rendered() uncovered branches

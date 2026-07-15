@@ -225,12 +225,18 @@ public struct PsAeroSpace {
         let deadline = Date().addingTimeInterval(startupTimeoutSeconds)
 
         while Date() < deadline {
-            // During recovery, avoid re-entering recovery orchestration from readiness probes.
+            // `aerospace --help` only proves the client binary is installed; it
+            // succeeds while the AeroSpace app/server is still unavailable.
+            // Probe a daemon-backed command so callers cannot race startup.
+            // During recovery, stay outside breaker accounting to avoid re-entry.
             let ready = circuitBreaker.isRecoveryInProgress
                 ? isCliReadyOffBreakerProbe()
-                : isCliAvailable()
+                : isCliReadyRecordedProbe()
             if ready {
                 return .success(())
+            }
+            if !circuitBreaker.isRecoveryInProgress, circuitBreaker.isOpen {
+                break
             }
             Thread.sleep(forTimeInterval: readinessCheckInterval)
         }
@@ -278,7 +284,7 @@ public struct PsAeroSpace {
     /// - Returns: Success when compatible, or an error describing missing support.
     func checkCompatibility() -> Result<Void, PsCoreError> {
         let checks: [(command: String, requiredFlags: [String])] = [
-            ("list-workspaces", ["--all", "--focused"]),
+            ("list-workspaces", ["--all", "--focused", "--format"]),
             ("list-windows", ["--monitor", "--workspace", "--focused", "--app-bundle-id", "--format"]),
             ("summon-workspace", []),
             ("move-node-to-workspace", ["--window-id"]),
@@ -547,16 +553,19 @@ public struct PsAeroSpace {
 
     /// Returns windows for the given app across all monitors.
     ///
-    /// Searches globally first (no `--monitor` flag). If that fails (older AeroSpace builds),
+    /// Searches globally first (`--monitor all`). If that fails (older AeroSpace builds),
     /// falls back to `--monitor focused`. This is the one exception to the "prefer scoped
     /// queries" guidance — tagged-window resolution needs global scope.
     ///
     /// - Parameter bundleId: App bundle identifier to filter.
     /// - Returns: Window list or an error.
     func listWindowsForApp(bundleId: String) -> Result<[PsWindow], PsCoreError> {
-        // Preferred: global search (no --monitor flag)
+        // Preferred: global search. AeroSpace requires an explicit scope, and
+        // `--all` cannot be combined with app filters, so use `--monitor all`.
         let globalResult = runAerospace(arguments: [
             "list-windows",
+            "--monitor",
+            "all",
             "--app-bundle-id",
             bundleId,
             "--format",
@@ -568,7 +577,10 @@ public struct PsAeroSpace {
                 if result.exitCode == 0 {
                     return parseWindowSummaries(output: result.stdout)
                 }
-                return .failure(commandError("aerospace list-windows --app-bundle-id \(bundleId)", result: result))
+                return .failure(commandError(
+                    "aerospace list-windows --monitor all --app-bundle-id \(bundleId)",
+                    result: result
+                ))
             case .failure(let error):
                 return .failure(error)
             }
@@ -1189,6 +1201,19 @@ public struct PsAeroSpace {
     private func isCliReadyOffBreakerProbe() -> Bool {
         switch commandRunner.run(
             executable: "aerospace",
+            arguments: ["list-workspaces", "--focused"],
+            timeoutSeconds: 2
+        ) {
+        case .failure:
+            return false
+        case .success(let result):
+            return result.exitCode == 0
+        }
+    }
+
+    /// Daemon-backed readiness probe that participates in normal breaker accounting.
+    private func isCliReadyRecordedProbe() -> Bool {
+        switch transport.executeAndRecord(
             arguments: ["list-workspaces", "--focused"],
             timeoutSeconds: 2
         ) {

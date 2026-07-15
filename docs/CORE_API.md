@@ -126,6 +126,7 @@ public struct ProjectConfig: Equatable, Sendable {
     public let path: String
     public let color: String  // Named color or hex (#RRGGBB)
     public let useAgentLayer: Bool  // Resolved: global default + per-project override
+    public let openChrome: Bool  // Default: true
     public let chromePinnedTabs: [String]
     public let chromeDefaultTabs: [String]
 
@@ -197,12 +198,12 @@ Single point of entry for all project operations.
 The activation sequence is **strictly sequential** and mirrors the proven shell-script
 flow (see `docs/using_aerospace.md` § "Project Activation Command Sequence"):
 
-1. Check for existing tagged Chrome window
-2. If no existing window: resolve initial Chrome tab URLs (from snapshot or cold-start defaults), launch Chrome with URLs (with fallback to empty tabs on failure)
+1. When `openChrome` is enabled, check for an existing tagged Chrome window
+2. If no existing window: resolve initial Chrome tab URLs (from snapshot or cold-start defaults), launch Chrome with URLs (fall back to empty tabs only when the launch command fails), and identify one newly created window if its title token is still propagating; report Chrome failures as warnings
 3. Find or launch tagged VS Code window
-4. Move Chrome to workspace (no focus follow)
+4. If Chrome is available, move it to the workspace (no focus follow)
 5. Move VS Code to workspace (with focus follow)
-6. Verify both windows arrived in workspace
+6. Require VS Code to arrive in the workspace; report optional Chrome arrival failures as warnings
 7. Focus workspace (`summon-workspace` with fallback)
 8. Focus IDE window
 9. Verify focus stability (poll)
@@ -279,8 +280,8 @@ public final class ProjectManager {
 
     /// Activates a project by ID (sequential flow).
     ///
-    /// Runs the full activation sequence: find/launch Chrome → find/launch VS Code
-    /// → move Chrome to workspace → move VS Code to workspace (focus follows)
+    /// Runs the full activation sequence: optionally find/launch Chrome → find/launch VS Code
+    /// → optionally move Chrome to workspace → move VS Code to workspace (focus follows)
     /// → verify workspace membership → focus workspace → focus IDE
     /// → verify focus stability.
     ///
@@ -288,7 +289,7 @@ public final class ProjectManager {
     ///   - projectId: The project ID to activate.
     ///   - preCapturedFocus: Focus state captured before showing UI, used for restoring
     ///     focus when exiting the project later.
-    /// - Returns: Activation success (IDE window ID + optional tab restore warning) or error.
+    /// - Returns: Activation success (IDE window ID + optional Chrome warning) or error.
     public func selectProject(projectId: String, preCapturedFocus: CapturedFocus) async -> Result<ProjectActivationSuccess, ProjectError>
 
     /// Closes a project by ID and restores focus to non-project space.
@@ -328,9 +329,9 @@ public enum ProjectError: Error, Equatable, Sendable {
 
 public struct ProjectActivationSuccess: Equatable, Sendable {
     public let ideWindowId: Int
-    public let tabRestoreWarning: String?
+    public let chromeWarning: String?
     public let layoutWarning: String?
-    public init(ideWindowId: Int, tabRestoreWarning: String?, layoutWarning: String? = nil)
+    public init(ideWindowId: Int, chromeWarning: String?, layoutWarning: String? = nil)
 }
 
 public struct ProjectCloseSuccess: Equatable, Sendable {
@@ -916,7 +917,7 @@ documented here because they implement the activation command sequence.
 
 ```swift
 // Window resolution — global search with fallback to focused monitor.
-// Matches: aerospace list-windows --app-bundle-id <id> --format <fmt>
+// Matches: aerospace list-windows --monitor all --app-bundle-id <id> --format <fmt>
 //          || aerospace list-windows --monitor focused --app-bundle-id <id> --format <fmt>
 func listWindowsForApp(bundleId: String) -> Result<[PsWindow], PsCoreError>
 

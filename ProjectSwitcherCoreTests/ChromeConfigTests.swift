@@ -102,6 +102,39 @@ final class ChromeConfigTests: XCTestCase {
         XCTAssertNotNil(result.config)
         XCTAssertEqual(result.projects.first?.chromePinnedTabs, [])
         XCTAssertEqual(result.projects.first?.chromeDefaultTabs, [])
+        XCTAssertEqual(result.projects.first?.openChrome, true)
+    }
+
+    func testParsePerProjectOpenChromeFalse() {
+        let toml = """
+        [[project]]
+        name = "Test"
+        path = "/test"
+        color = "blue"
+        openChrome = false
+        """
+
+        let result = ConfigParser.parse(toml: toml)
+
+        XCTAssertNotNil(result.config)
+        XCTAssertEqual(result.projects.first?.openChrome, false)
+    }
+
+    func testParsePerProjectOpenChromeWrongTypeFails() {
+        let toml = """
+        [[project]]
+        name = "Test"
+        path = "/test"
+        color = "blue"
+        openChrome = "no"
+        """
+
+        let result = ConfigParser.parse(toml: toml)
+
+        XCTAssertNil(result.config)
+        XCTAssertTrue(result.findings.contains {
+            $0.severity == .fail && $0.title.contains("project[0].openChrome must be a boolean")
+        })
     }
 
     // MARK: - Invalid URL hard failures

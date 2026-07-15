@@ -151,8 +151,8 @@ final class AeroSpaceListWindowsFallbackTests: XCTestCase {
             XCTFail("Expected success but got: \(error.message)")
         }
         XCTAssertEqual(runner.calls.count, 1)
-        // Global search: no --monitor flag
-        XCTAssertFalse(runner.calls[0].arguments.contains("--monitor"))
+        XCTAssertTrue(runner.calls[0].arguments.contains("--monitor"))
+        XCTAssertTrue(runner.calls[0].arguments.contains("all"))
     }
 
     func testListWindowsForAppFallsBackToFocusedMonitorOnIncompatibility() {
@@ -338,4 +338,3 @@ final class AeroSpaceMoveWindowFallbackTests: XCTestCase {
         XCTAssertEqual(runner.calls.count, 1)
     }
 }
-

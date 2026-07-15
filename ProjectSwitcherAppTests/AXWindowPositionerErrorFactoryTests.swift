@@ -4,6 +4,13 @@ import XCTest
 @testable import ProjectSwitcherCore
 
 final class AXWindowPositionerErrorFactoryTests: XCTestCase {
+    func testTokenMatcherRejectsLongerProjectIdPrefix() {
+        XCTAssertTrue(AXWindowPositioner.matchesLeadingToken(title: "PS:sample-project - Chrome", token: "PS:sample-project"))
+        XCTAssertTrue(AXWindowPositioner.matchesLeadingToken(title: "  PS:sample-project", token: "PS:sample-project"))
+        XCTAssertFalse(AXWindowPositioner.matchesLeadingToken(title: "PS:sample-project-original - Chrome", token: "PS:sample-project"))
+        XCTAssertFalse(AXWindowPositioner.matchesLeadingToken(title: "Notes PS:sample-project - Chrome", token: "PS:sample-project"))
+    }
+
 
     // MARK: - windowTokenNotFoundError
 
@@ -66,5 +73,27 @@ final class AXWindowPositionerErrorFactoryTests: XCTestCase {
         )
         XCTAssertTrue(error.isWindowInventoryEmpty)
         XCTAssertFalse(error.isWindowTokenNotFound)
+    }
+
+    // MARK: - windowEnumerationError
+
+    func testCannotCompleteEnumerationErrorIsTransient() {
+        let error = AXWindowPositioner.windowEnumerationError(
+            bundleId: "com.microsoft.VSCode",
+            axError: .cannotComplete
+        )
+
+        XCTAssertEqual(error.reason, .windowEnumerationIncomplete)
+        XCTAssertTrue(error.isTransientWindowLookupFailure)
+    }
+
+    func testPermissionDeniedEnumerationErrorIsPermanent() {
+        let error = AXWindowPositioner.windowEnumerationError(
+            bundleId: "com.microsoft.VSCode",
+            axError: .apiDisabled
+        )
+
+        XCTAssertNil(error.reason)
+        XCTAssertFalse(error.isTransientWindowLookupFailure)
     }
 }

@@ -1220,9 +1220,10 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = AA676751FC41071DBC9B14FA /* Build configuration list for PBXProject "ProjectSwitcher" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -1235,6 +1236,7 @@
 				8DCAB2655796DECA00B22F38 /* XCRemoteSwiftPackageReference "TOMLDecoder" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 866899B9B27F37CA57C1B450 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1670,13 +1672,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = release/ProjectSwitcher.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				INFOPLIST_FILE = ProjectSwitcherApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.projectswitcher.ProjectSwitcher.dev;
 				PRODUCT_NAME = "ProjectSwitcher Dev";
 				SDKROOT = macosx;
@@ -1808,13 +1810,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = release/ProjectSwitcher.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				INFOPLIST_FILE = ProjectSwitcherApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.projectswitcher.ProjectSwitcher;
 				PRODUCT_NAME = ProjectSwitcher;
 				SDKROOT = macosx;
@@ -1875,14 +1877,14 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = ProjectSwitcherApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.projectswitcher.ProjectSwitcher;
 				PRODUCT_NAME = ProjectSwitcher;
 				SDKROOT = macosx;
@@ -2069,13 +2071,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = release/ProjectSwitcher.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				INFOPLIST_FILE = ProjectSwitcherApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.projectswitcher.ProjectSwitcher.dev;
 				PRODUCT_NAME = "ProjectSwitcher Dev";
 				SDKROOT = macosx;

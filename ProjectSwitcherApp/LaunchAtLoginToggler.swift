@@ -160,3 +160,40 @@ struct LaunchAtLoginToggler {
         }
     }
 }
+
+/// Reconciles the configured launch-at-login value with the current service state.
+struct LaunchAtLoginSynchronizer {
+    private let service: LaunchAtLoginServiceManaging
+
+    /// Creates a synchronizer with an injectable login-item service.
+    /// - Parameter service: Login-item service adapter.
+    init(service: LaunchAtLoginServiceManaging = MainAppLaunchAtLoginService()) {
+        self.service = service
+    }
+
+    /// Applies the configured value only when registration state must change.
+    /// - Parameter configValue: Desired launch-at-login setting.
+    /// - Returns: Structured log entries describing an attempted state change.
+    func sync(configValue: Bool) -> [LaunchAtLoginLogEntry] {
+        guard service.isEnabled != configValue else { return [] }
+
+        do {
+            if configValue {
+                try service.register()
+                return [.init(event: "launch_at_login.registered", level: .info, message: nil, context: nil)]
+            }
+
+            try service.unregister()
+            return [.init(event: "launch_at_login.unregistered", level: .info, message: nil, context: nil)]
+        } catch {
+            let action = configValue ? "registration" : "unregistration"
+            let event = configValue ? "launch_at_login.register_failed" : "launch_at_login.unregister_failed"
+            return [.init(
+                event: event,
+                level: .warn,
+                message: "Launch at login configured but \(action) failed: \(error.localizedDescription)",
+                context: nil
+            )]
+        }
+    }
+}

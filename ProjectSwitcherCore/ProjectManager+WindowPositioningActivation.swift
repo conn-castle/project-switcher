@@ -25,7 +25,7 @@ extension ProjectManager {
             case .success(let value):
                 return (.success(value), attempt, false)
             case .failure(let error):
-                let isTransient = error.isWindowTokenNotFound
+                let isTransient = error.isTransientWindowLookupFailure
                 if isTransient && attempt < maxRetries {
                     try? await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000_000))
                     continue
@@ -40,12 +40,12 @@ extension ProjectManager {
 
     // MARK: - Window Positioning
 
-    /// Positions IDE and Chrome windows after activation.
+    /// Positions the IDE and, when requested, Chrome windows after activation.
     ///
     /// Non-fatal: returns a warning string on failure, nil on success.
     /// Requires windowPositioner, screenModeDetector, and windowPositionStore to all be set.
     /// If only some positioning dependencies are wired, returns a diagnostic warning.
-    func positionWindows(projectId: String) async -> String? {
+    func positionWindows(projectId: String, includeChrome: Bool = true) async -> String? {
         // All three positioning deps must be present. If only some are wired, surface a warning.
         let hasPositioner = windowPositioner != nil
         let hasDetector = screenModeDetector != nil
@@ -99,7 +99,7 @@ extension ProjectManager {
             case .failure(let error):
                 // Only retry transient "window not found" errors (title not yet updated).
                 // Permanent errors (AX permission denied, app not running, etc.) fail immediately.
-                let isTransient = error.isWindowTokenNotFound
+                let isTransient = error.isTransientWindowLookupFailure
                 if isTransient && frameAttempt < maxFrameRetries {
                     // Probe for a permanent zero-window condition, but require multiple
                     // confirmations plus minimum retry confidence before fast-failing.
@@ -302,7 +302,13 @@ extension ProjectManager {
             warnings.append("IDE positioning failed: \(error.message)")
         }
 
-        // Position Chrome windows (retry briefly — Chrome title may not be visible to AX immediately)
+        // Position Chrome windows (retry briefly — Chrome title may not be visible to AX immediately).
+        // Skip the entire Chrome path when it was disabled or unavailable; the AX fallback
+        // must never adopt and reposition an unrelated Chrome window.
+        guard includeChrome else {
+            return warnings.isEmpty ? nil : warnings.joined(separator: "; ")
+        }
+
         let (chromeSetResult, chromeSetAttempts, chromeUsedFallback) = await retryTransientWindowOp(
             maxRetries: 5,
             retryInterval: frameRetryInterval,

@@ -15,8 +15,8 @@ import ProjectSwitcherCore
 
 /// Coordinates project operations for the switcher panel.
 ///
-/// Owns single-flight guards (`isActivating`, `isExitingToNonProject`,
-/// `isRecoveringProject`) and dispatches `ProjectManager` calls on
+/// Owns single-flight guards (`isActivating`, `isClosingProject`,
+/// `isExitingToNonProject`, `isRecoveringProject`) and dispatches `ProjectManager` calls on
 /// background queues. Reports results through closures so the controller
 /// can perform UI updates.
 final class SwitcherOperationCoordinator {
@@ -60,6 +60,7 @@ final class SwitcherOperationCoordinator {
     // MARK: - Operation Guards
 
     private(set) var isActivating: Bool = false
+    private(set) var isClosingProject: Bool = false
     private(set) var isExitingToNonProject: Bool = false
     private(set) var isRecoveringProject: Bool = false
 
@@ -81,6 +82,7 @@ final class SwitcherOperationCoordinator {
     func resetGuards() {
         dispatchPrecondition(condition: .onQueue(.main))
         isActivating = false
+        isClosingProject = false
         isExitingToNonProject = false
         isRecoveringProject = false
     }
@@ -94,6 +96,15 @@ final class SwitcherOperationCoordinator {
     ///   - capturedFocus: The pre-switcher focus for exit restoration.
     func handleProjectSelection(_ project: ProjectConfig, capturedFocus: CapturedFocus?) {
         dispatchPrecondition(condition: .onQueue(.main))
+        guard !isActivating else {
+            session.logEvent(
+                event: "switcher.project.selection_skipped",
+                level: .warn,
+                message: "Project activation is already in progress.",
+                context: ["project_id": project.id, "reason": "activation_in_progress"]
+            )
+            return
+        }
         session.logEvent(
             event: "switcher.project.selected",
             context: [
@@ -129,9 +140,9 @@ final class SwitcherOperationCoordinator {
 
                 switch result {
                 case .success(let activation):
-                    if let warning = activation.tabRestoreWarning {
+                    if let warning = activation.chromeWarning {
                         self.session.logEvent(
-                            event: "switcher.project.tab_restore_warning",
+                            event: "switcher.project.chrome_warning",
                             level: .warn,
                             message: warning,
                             context: ["project_id": projectId]
@@ -185,6 +196,17 @@ final class SwitcherOperationCoordinator {
         fallbackSelectionKey: String?
     ) {
         dispatchPrecondition(condition: .onQueue(.main))
+        guard !isClosingProject else {
+            session.logEvent(
+                event: "switcher.close_project.duplicate_ignored",
+                level: .info,
+                context: ["project_id": projectId]
+            )
+            return
+        }
+
+        isClosingProject = true
+        onSetControlsEnabled?(false)
         session.logEvent(
             event: "switcher.close_project.requested",
             context: [
@@ -207,6 +229,8 @@ final class SwitcherOperationCoordinator {
 
             let capturedFocus = refreshedFocus
             await MainActor.run {
+                self.isClosingProject = false
+                self.onSetControlsEnabled?(true)
                 switch closeResult {
                 case .success(let result):
                     if let warning = result.tabCaptureWarning {

@@ -28,8 +28,25 @@ extension ProjectManager {
         windowLabel: String,
         eventSource: String
     ) async -> Result<FindOrLaunchOutcome, ProjectError> {
+        // Capture the pre-launch inventory so Chrome can be identified by a newly
+        // appeared window ID when AeroSpace has not refreshed its title yet.
+        let windowsBeforeLaunch: [PsWindow]
+        switch aerospace.listWindowsForApp(bundleId: appBundleId) {
+        case .success(let windows):
+            windowsBeforeLaunch = windows
+        case .failure(let error):
+            logEvent("window_lookup.list_failed", level: .warn,
+                     message: error.message,
+                     context: ["app_bundle_id": appBundleId, "project_id": projectId])
+            // Absence has not been established. Launching here can duplicate a
+            // window that is merely hidden by an AeroSpace outage.
+            return .failure(.aeroSpaceError(detail: error.message))
+        }
+
         // Find existing tagged window (global search with fallback)
-        if let window = findWindowByToken(appBundleId: appBundleId, projectId: projectId) {
+        if let window = windowsBeforeLaunch.first(where: {
+            PsIdeToken.matches(windowTitle: $0.windowTitle, projectId: projectId)
+        }) {
             logEvent(Self.activationWindowEventName(source: eventSource, action: "found"), context: ["window_id": "\(window.windowId)"])
             return .success(FindOrLaunchOutcome(window: window, wasLaunched: false))
         }
@@ -47,7 +64,15 @@ extension ProjectManager {
         }
 
         // Poll until window appears
-        return await pollForWindowByToken(appBundleId: appBundleId, projectId: projectId, windowLabel: windowLabel)
+        let newWindowBaselineIds = appBundleId == PsChromeLauncher.bundleId
+            ? Set(windowsBeforeLaunch.map(\.windowId))
+            : nil
+        return await pollForWindowByToken(
+            appBundleId: appBundleId,
+            projectId: projectId,
+            windowLabel: windowLabel,
+            newWindowBaselineIds: newWindowBaselineIds
+        )
             .map { FindOrLaunchOutcome(window: $0, wasLaunched: true) }
     }
 

@@ -5,6 +5,15 @@ import Foundation
 /// Shared IDE token prefix used to tag new IDE windows.
 enum PsIdeToken {
     static let prefix = "PS:"
+
+    /// Matches a leading project token without allowing project-ID prefix collisions.
+    static func matches(windowTitle: String, projectId: String) -> Bool {
+        let title = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = "\(prefix)\(projectId)"
+        guard title.hasPrefix(token) else { return false }
+        let suffix = title.dropFirst(token.count)
+        return suffix.isEmpty || suffix.first?.isWhitespace == true
+    }
 }
 
 /// Launches new VS Code windows with a tagged window title.
@@ -180,7 +189,10 @@ struct PsChromeLauncher {
 
         var scriptLines = [
             "tell application \"Google Chrome\"",
-            "set newWindow to make new window"
+            "set newWindow to make new window",
+            // Tag immediately. If a later URL/tab operation fails, the already-created
+            // side-effect window remains discoverable and will not be duplicated by retry.
+            "set given name of newWindow to \"\(windowTitle)\""
         ]
 
         if !initialURLs.isEmpty {
@@ -195,7 +207,6 @@ struct PsChromeLauncher {
             }
         }
 
-        scriptLines.append("set given name of newWindow to \"\(windowTitle)\"")
         scriptLines.append("end tell")
 
         switch commandRunner.run(executable: "osascript", arguments: PsChromeLauncher.scriptArguments(lines: scriptLines), timeoutSeconds: 15) {

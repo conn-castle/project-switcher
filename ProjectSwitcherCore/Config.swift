@@ -123,6 +123,8 @@ public struct ProjectConfig: Equatable, Sendable {
     public let path: String
     public let color: String
     public let useAgentLayer: Bool
+    /// Whether project activation should find or launch a Chrome window.
+    public let openChrome: Bool
     /// Per-project URLs always opened as leftmost tabs.
     public let chromePinnedTabs: [String]
     /// Per-project URLs opened when no tab history exists.
@@ -138,6 +140,7 @@ public struct ProjectConfig: Equatable, Sendable {
         path: String,
         color: String,
         useAgentLayer: Bool,
+        openChrome: Bool = true,
         chromePinnedTabs: [String] = [],
         chromeDefaultTabs: [String] = []
     ) {
@@ -147,6 +150,7 @@ public struct ProjectConfig: Equatable, Sendable {
         self.path = path
         self.color = color
         self.useAgentLayer = useAgentLayer
+        self.openChrome = openChrome
         self.chromePinnedTabs = chromePinnedTabs
         self.chromeDefaultTabs = chromeDefaultTabs
     }
